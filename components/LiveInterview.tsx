@@ -216,7 +216,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                <motion.div 
                 animate={{ scale: [1, 1 + currentInputVolume * 0.05, 1], opacity: [0.1, 0.2, 0.1] }}
-                className="w-96 h-96 rounded-full bg-brand-100 blur-3xl"
+                className="w-96 h-96 rounded-full bg-slate-100 blur-3xl"
                />
             </div>
           )}
@@ -230,13 +230,13 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                 </div>
               ) : isActive ? (
                 <div className="relative">
-                   <div className="w-24 h-24 rounded-full bg-white border-4 border-brand-100 flex items-center justify-center shadow-2xl relative z-10">
+                   <div className="w-24 h-24 rounded-full bg-white border-4 border-slate-100 flex items-center justify-center shadow-2xl relative z-10">
                      <Mic className="w-10 h-10 text-brand-600" />
                    </div>
                    <motion.div 
                      animate={{ scale: 1.5, opacity: 0 }} 
                      transition={{ repeat: Infinity, duration: 2 }}
-                     className="absolute inset-0 bg-brand-200 rounded-full"
+                     className="absolute inset-0 bg-slate-200 rounded-full"
                    />
                 </div>
               ) : (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Mic, FileText, TrendingUp, CheckCircle, Upload, Star, Shield, Zap, Layout, Users, Award } from 'lucide-react';
+import { ArrowRight, Mic, FileText, CheckCircle, Upload, Star, Zap, Award } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge } from './ui/DesignSystem';
 
@@ -42,8 +42,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
       {/* Hero Section */}
       <div className="pt-32 pb-20 lg:pt-48 lg:pb-32 relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
-           <div className="absolute top-20 right-0 w-[800px] h-[800px] bg-brand-50/50 rounded-full blur-3xl -z-10" />
-           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-50/50 rounded-full blur-3xl -z-10" />
+           <div className="absolute top-20 right-0 w-[800px] h-[800px] bg-slate-100/50 rounded-full blur-3xl -z-10" />
+           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-slate-50/50 rounded-full blur-3xl -z-10" />
         </div>
 
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
@@ -94,7 +94,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="relative hidden lg:block"
           >
-             <div className="absolute inset-0 bg-gradient-to-br from-brand-600/10 to-transparent rounded-3xl transform rotate-3 scale-105" />
+             <div className="absolute inset-0 bg-gradient-to-br from-slate-200/50 to-transparent rounded-3xl transform rotate-3 scale-105" />
              <Card className="relative bg-white shadow-2xl shadow-slate-200/50 p-8 border-slate-100 backdrop-blur-sm">
                 <div className="absolute -top-6 -right-6 bg-white p-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3 animate-bounce duration-[3000ms]">
                    <div className="bg-emerald-100 p-2 rounded-lg"><CheckCircle className="w-6 h-6 text-emerald-600" /></div>
@@ -184,7 +184,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
                <div className="order-2 lg:order-1">
                   <div className="relative">
-                     <div className="absolute inset-0 bg-brand-600 blur-3xl opacity-10 rounded-full" />
+                     <div className="absolute inset-0 bg-slate-200 blur-3xl opacity-20 rounded-full" />
                      <Card className="relative p-0 overflow-hidden shadow-2xl border-0">
                         <div className="bg-slate-900 p-4 flex items-center gap-2">
                            <div className="flex gap-1.5">
@@ -208,7 +208,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
                   </div>
                </div>
                <div className="order-1 lg:order-2 space-y-6">
-                  <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center text-brand-600 mb-4">
+                  <div className="w-12 h-12 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-brand-600 mb-4 shadow-sm">
                      <FileText className="w-6 h-6" />
                   </div>
                   <h2 className="text-3xl md:text-4xl font-bold text-slate-900 font-display">Beat the ATS Robots.</h2>
@@ -228,7 +228,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
             {/* Feature 2 */}
             <div className="grid lg:grid-cols-2 gap-16 items-center">
                <div className="space-y-6">
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4">
+                  <div className="w-12 h-12 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-purple-600 mb-4 shadow-sm">
                      <Mic className="w-6 h-6" />
                   </div>
                   <h2 className="text-3xl md:text-4xl font-bold text-slate-900 font-display">Practice Makes Perfect.</h2>
@@ -240,7 +240,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
                   </Button>
                </div>
                <div className="relative">
-                  <div className="absolute inset-0 bg-purple-600 blur-3xl opacity-10 rounded-full" />
+                  <div className="absolute inset-0 bg-slate-200 blur-3xl opacity-20 rounded-full" />
                   <Card className="relative p-8 shadow-2xl border-slate-200">
                      <div className="flex items-center justify-center h-48 bg-slate-50 rounded-2xl mb-6 border border-slate-100 relative overflow-hidden">
                         <div className="absolute inset-0 flex items-center justify-center gap-1">
@@ -319,18 +319,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
       {/* CTA */}
       <div className="py-24 bg-white">
          <div className="max-w-5xl mx-auto px-6">
-            <div className="bg-brand-600 rounded-3xl p-12 md:p-20 text-center relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
-               <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2" />
+            <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 md:p-20 text-center relative overflow-hidden shadow-sm">
                
-               <h2 className="text-3xl md:text-5xl font-bold text-white mb-8 relative z-10 font-display">Ready to accelerate your career?</h2>
-               <p className="text-brand-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 relative z-10">
+               <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-8 relative z-10 font-display">Ready to accelerate your career?</h2>
+               <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto mb-10 relative z-10">
                   Join thousands of professionals who are landing better jobs, faster.
                </p>
-               <Button onClick={onGetStarted} size="xl" variant="secondary" className="relative z-10 shadow-2xl">
+               <Button onClick={onGetStarted} size="xl" variant="primary" className="relative z-10 shadow-xl shadow-brand-600/20">
                   Start For Free <ArrowRight className="w-5 h-5 ml-2" />
                </Button>
-               <p className="mt-6 text-brand-200 text-sm font-medium relative z-10">No credit card required · Cancel anytime</p>
+               <p className="mt-6 text-slate-400 text-sm font-medium relative z-10">No credit card required · Cancel anytime</p>
             </div>
          </div>
       </div>

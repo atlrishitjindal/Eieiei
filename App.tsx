@@ -69,7 +69,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans">
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900 font-sans">
       <Sidebar 
         currentView={currentView}
         setCurrentView={setCurrentView}
@@ -80,12 +80,12 @@ function App() {
 
       <main className="flex-1 flex flex-col min-w-0 h-full relative">
         {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between p-4 bg-zinc-950/80 backdrop-blur border-b border-zinc-800 sticky top-0 z-20">
+        <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-20">
           <div className="flex items-center gap-3">
-             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-zinc-400 hover:bg-zinc-900 rounded-lg">
+             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
                {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
              </button>
-             <span className="font-bold text-white tracking-tight">CareerCraft</span>
+             <span className="font-bold text-slate-900 tracking-tight">CareerMint</span>
           </div>
         </div>
 

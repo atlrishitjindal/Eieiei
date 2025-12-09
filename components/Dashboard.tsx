@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, FileText, Briefcase, Mail, Clock, Star, Zap, Activity, ChevronRight, Plus } from 'lucide-react';
+import { Mic, FileText, Briefcase, Mail, Clock, Star, Zap, Activity, ChevronRight, Plus, Crown } from 'lucide-react';
 import { AppView, ResumeAnalysis, ActivityLog } from '../types';
 import { motion } from 'framer-motion';
 import { Card, Button, Badge } from './ui/DesignSystem';
@@ -206,14 +206,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setCurrentView, resumeAnaly
              </Card>
           </section>
 
-          <Card className="bg-brand-900 text-white border-none p-6 relative overflow-hidden">
-             <div className="relative z-10">
-               <h4 className="font-bold text-lg mb-2">Upgrade to Pro</h4>
-               <p className="text-brand-100 text-sm mb-4">Unlock unlimited resume scans and mock interviews.</p>
-               <Button size="sm" className="bg-white text-brand-900 hover:bg-brand-50 border-none w-full">View Plans</Button>
+          <Card className="bg-white border-2 border-brand-100 p-6 relative overflow-hidden group hover:border-brand-200 transition-colors">
+             <div className="relative z-10 text-center">
+               <div className="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <Crown className="w-6 h-6 text-brand-600" />
+               </div>
+               <h4 className="font-bold text-lg text-slate-900 mb-2">Upgrade to Pro</h4>
+               <p className="text-slate-500 text-sm mb-4">Unlock unlimited resume scans and mock interviews.</p>
+               <Button size="sm" variant="primary" className="w-full">View Plans</Button>
              </div>
-             <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-brand-700/50 rounded-full blur-2xl" />
-             <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-20 h-20 bg-brand-500/50 rounded-full blur-xl" />
           </Card>
         </motion.div>
       </div>
