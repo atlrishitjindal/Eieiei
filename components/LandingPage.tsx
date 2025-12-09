@@ -1,7 +1,7 @@
 import React from 'react';
-import { ArrowRight, Mic, FileText, TrendingUp, CheckCircle, Zap, Shield, Globe, Star, Upload } from 'lucide-react';
+import { ArrowRight, Mic, FileText, TrendingUp, CheckCircle, Upload, Star, Shield, Zap, Layout, Users, Award } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button, Card } from './ui/DesignSystem';
+import { Button, Card, Badge } from './ui/DesignSystem';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -12,170 +12,374 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
   return (
     <div className="min-h-screen bg-white font-sans selection:bg-brand-100 selection:text-brand-900">
       {/* Navbar */}
-      <nav className="fixed top-0 w-full border-b border-slate-200 bg-white/80 backdrop-blur-lg z-50">
+      <nav className="fixed top-0 w-full border-b border-slate-100 bg-white/90 backdrop-blur-md z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-              <span className="font-bold text-white text-lg">C</span>
+            <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-600/20">
+              <span className="font-bold text-white text-xl font-display">C</span>
             </div>
             <span className="font-bold text-xl tracking-tight text-slate-900 font-display">CareerMint</span>
           </div>
           
-          <div className="flex items-center gap-4">
-            <button onClick={onLogin} className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors hidden sm:block">
-              Log In
-            </button>
-            <Button onClick={onGetStarted} size="md" className="rounded-full px-6">
-              Get Started Free
-            </Button>
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+              <a href="#features" className="hover:text-brand-600 transition-colors">Features</a>
+              <a href="#how-it-works" className="hover:text-brand-600 transition-colors">How it Works</a>
+              <a href="#testimonials" className="hover:text-brand-600 transition-colors">Success Stories</a>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={onLogin} className="text-sm font-bold text-slate-600 hover:text-brand-600 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all">
+                Log In
+              </button>
+              <Button onClick={onGetStarted} size="md" className="rounded-full px-6 shadow-brand-200">
+                Get Started
+              </Button>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <div className="pt-32 pb-20 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+      <div className="pt-32 pb-20 lg:pt-48 lg:pb-32 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
+           <div className="absolute top-20 right-0 w-[800px] h-[800px] bg-brand-50/50 rounded-full blur-3xl -z-10" />
+           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-50/50 rounded-full blur-3xl -z-10" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-left space-y-6"
+            transition={{ duration: 0.5 }}
+            className="text-left space-y-8"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span>
-              New: AI Interview Coach
-            </div>
+            <Badge variant="brand" className="pl-2 pr-4 py-1.5 bg-brand-50 border-brand-100 text-brand-700 text-sm font-medium rounded-full inline-flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-brand-600 animate-pulse"></span>
+              v2.0 is now live
+            </Badge>
             
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-slate-900 leading-[1.1] font-display">
-              Build a professional resume in <span className="text-brand-600">minutes.</span>
+            <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.05] font-display">
+              Land your dream job <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-blue-500">faster.</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-slate-500 leading-relaxed max-w-lg">
-              The AI-powered career assistant that writes your resume, practices interviews with you, and lands you more offers.
+            <p className="text-xl text-slate-500 leading-relaxed max-w-lg">
+              The only AI career assistant that optimizes your resume, simulates real interviews, and tracks your applications in one place.
             </p>
             
-            <div className="flex flex-wrap items-center gap-4 pt-4">
-              <Button onClick={onGetStarted} size="xl" className="shadow-xl shadow-brand-600/20">
-                Build My Resume <ArrowRight className="w-5 h-5 ml-2" />
+            <div className="flex flex-col sm:flex-row items-start gap-4 pt-2">
+              <Button onClick={onGetStarted} size="xl" className="w-full sm:w-auto rounded-full px-8 shadow-xl shadow-brand-600/20 text-lg h-14">
+                Analyze My Resume <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-              <div className="text-sm text-slate-500 font-medium px-4">
-                No credit card required
+              <div className="flex items-center gap-4 px-4 h-14">
+                <div className="flex -space-x-3">
+                   {[1,2,3].map(i => (
+                     <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden">
+                        <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" className="w-full h-full object-cover" />
+                     </div>
+                   ))}
+                </div>
+                <div className="text-sm">
+                  <p className="font-bold text-slate-900">2,000+ Hired</p>
+                  <div className="flex text-yellow-400">
+                    {[1,2,3,4,5].map(i => <Star key={i} className="w-3 h-3 fill-current" />)}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div className="pt-8 flex items-center gap-4 text-sm text-slate-500">
-               <div className="flex -space-x-2">
-                 {[1,2,3,4].map(i => (
-                   <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200" />
-                 ))}
-               </div>
-               <p>Trusted by 10,000+ job seekers</p>
             </div>
           </motion.div>
 
-          {/* Hero Visual - Resume Upload Card */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="relative"
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="relative hidden lg:block"
           >
-             <div className="absolute inset-0 bg-brand-600/5 rounded-3xl transform rotate-3" />
-             <Card className="relative bg-white shadow-2xl shadow-slate-200 p-8 border-slate-200">
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
-                   <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                      <Upload className="w-8 h-8 text-brand-600" />
+             <div className="absolute inset-0 bg-gradient-to-br from-brand-600/10 to-transparent rounded-3xl transform rotate-3 scale-105" />
+             <Card className="relative bg-white shadow-2xl shadow-slate-200/50 p-8 border-slate-100 backdrop-blur-sm">
+                <div className="absolute -top-6 -right-6 bg-white p-4 rounded-xl shadow-xl border border-slate-100 flex items-center gap-3 animate-bounce duration-[3000ms]">
+                   <div className="bg-emerald-100 p-2 rounded-lg"><CheckCircle className="w-6 h-6 text-emerald-600" /></div>
+                   <div>
+                      <p className="font-bold text-slate-900 text-sm">Resume Score</p>
+                      <p className="text-emerald-600 font-bold text-lg">98/100</p>
                    </div>
-                   <h3 className="text-xl font-bold text-slate-900 mb-2">Upload Resume</h3>
-                   <p className="text-slate-500 text-sm">Drag & drop PDF to get your ATS score instantly</p>
-                   <Button size="sm" className="mt-6 pointer-events-none">Select File</Button>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between p-4 bg-emerald-50 border border-emerald-100 rounded-lg">
-                   <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-emerald-600 font-bold shadow-sm">94</div>
+                <div className="space-y-6">
+                   <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+                      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-2xl font-bold text-slate-400">JD</div>
                       <div>
-                         <p className="font-bold text-emerald-900 text-sm">Excellent Score</p>
-                         <p className="text-emerald-700 text-xs">Ready for applications</p>
+                         <h3 className="text-xl font-bold text-slate-900">John Doe</h3>
+                         <p className="text-slate-500">Senior Product Designer</p>
                       </div>
                    </div>
-                   <CheckCircle className="w-5 h-5 text-emerald-600" />
+                   
+                   <div className="space-y-4">
+                      <div className="h-4 bg-slate-100 rounded w-3/4"></div>
+                      <div className="h-4 bg-slate-100 rounded w-full"></div>
+                      <div className="h-4 bg-slate-100 rounded w-5/6"></div>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4 pt-4">
+                      <div className="bg-brand-50 p-4 rounded-xl border border-brand-100">
+                         <p className="text-xs font-bold text-brand-700 uppercase mb-1">Skills Match</p>
+                         <p className="text-2xl font-bold text-brand-900">95%</p>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                         <p className="text-xs font-bold text-purple-700 uppercase mb-1">Interview Prep</p>
+                         <p className="text-2xl font-bold text-purple-900">Ready</p>
+                      </div>
+                   </div>
                 </div>
              </Card>
           </motion.div>
         </div>
       </div>
 
-      {/* Logos Section */}
-      <div className="py-10 border-y border-slate-100 bg-slate-50/50">
+      {/* Social Proof */}
+      <div className="py-12 border-y border-slate-100 bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-6">Works with all major ATS systems</p>
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale">
-             {/* Simple Text Placeholders for Logos to avoid external assets */}
-             <span className="text-xl font-bold text-slate-800">Greenhouse</span>
-             <span className="text-xl font-bold text-slate-800">Lever</span>
-             <span className="text-xl font-bold text-slate-800">Workday</span>
-             <span className="text-xl font-bold text-slate-800">Indeed</span>
-             <span className="text-xl font-bold text-slate-800">LinkedIn</span>
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-8">Used by candidates hired at</p>
+          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
+             {['Google', 'Microsoft', 'Spotify', 'Airbnb', 'Notion', 'Slack'].map(brand => (
+                <span key={brand} className="text-xl md:text-2xl font-bold text-slate-800 font-display">{brand}</span>
+             ))}
           </div>
         </div>
       </div>
 
-      {/* Features Grid */}
-      <div className="py-24 bg-white">
+      {/* How it Works */}
+      <div id="how-it-works" className="py-24 bg-white relative">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+             <Badge variant="neutral" className="mb-4">Process</Badge>
+             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 font-display">How CareerMint works</h2>
+             <p className="text-lg text-slate-500">Three simple steps to transform your job search from stressful to successful.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-12 relative">
+             <div className="absolute top-12 left-0 w-full h-0.5 bg-slate-100 hidden md:block" />
+             
+             {[
+               { icon: Upload, title: "Upload Resume", desc: "Drag and drop your PDF. We parse it instantly using advanced AI." },
+               { icon: Zap, title: "Get AI Analysis", desc: "Receive a detailed ATS score and line-by-line improvement suggestions." },
+               { icon: Award, title: "Get Hired", desc: "Apply with confidence using tailored documents and interview practice." }
+             ].map((step, i) => (
+               <div key={i} className="relative bg-white p-6 pt-0 text-center">
+                  <div className="w-24 h-24 bg-white rounded-full border-8 border-slate-50 flex items-center justify-center mx-auto mb-6 relative z-10 shadow-sm">
+                     <step.icon className="w-10 h-10 text-brand-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-3">{step.title}</h3>
+                  <p className="text-slate-500 leading-relaxed">{step.desc}</p>
+               </div>
+             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Features Deep Dive */}
+      <div id="features" className="py-24 bg-slate-50 overflow-hidden">
+         <div className="max-w-7xl mx-auto px-6 space-y-32">
+            
+            {/* Feature 1 */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+               <div className="order-2 lg:order-1">
+                  <div className="relative">
+                     <div className="absolute inset-0 bg-brand-600 blur-3xl opacity-10 rounded-full" />
+                     <Card className="relative p-0 overflow-hidden shadow-2xl border-0">
+                        <div className="bg-slate-900 p-4 flex items-center gap-2">
+                           <div className="flex gap-1.5">
+                              <div className="w-3 h-3 rounded-full bg-red-500" />
+                              <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                              <div className="w-3 h-3 rounded-full bg-green-500" />
+                           </div>
+                           <div className="text-xs text-slate-400 font-mono ml-4">resume_analysis.json</div>
+                        </div>
+                        <div className="p-8 bg-white font-mono text-sm space-y-4">
+                           <div className="flex gap-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-100">
+                              <div className="font-bold">ATS Error:</div>
+                              <div>Missing keywords: "React", "TypeScript"</div>
+                           </div>
+                           <div className="flex gap-4 p-4 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+                              <div className="font-bold">Suggestion:</div>
+                              <div>Quantify achievements. E.g., "Increased sales by 20%..."</div>
+                           </div>
+                        </div>
+                     </Card>
+                  </div>
+               </div>
+               <div className="order-1 lg:order-2 space-y-6">
+                  <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center text-brand-600 mb-4">
+                     <FileText className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-bold text-slate-900 font-display">Beat the ATS Robots.</h2>
+                  <p className="text-lg text-slate-500 leading-relaxed">
+                     75% of resumes are rejected by automated systems before a human ever sees them. Our AI checks your resume against the exact criteria recruiters use.
+                  </p>
+                  <ul className="space-y-3 pt-4">
+                     {['Keyword Gap Analysis', 'Formatting Check', 'Impact Scoring'].map((item, i) => (
+                        <li key={i} className="flex items-center gap-3 text-slate-700 font-medium">
+                           <CheckCircle className="w-5 h-5 text-brand-500" /> {item}
+                        </li>
+                     ))}
+                  </ul>
+               </div>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+               <div className="space-y-6">
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4">
+                     <Mic className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-bold text-slate-900 font-display">Practice Makes Perfect.</h2>
+                  <p className="text-lg text-slate-500 leading-relaxed">
+                     Nervous about interviews? Practice with our AI hiring manager. It speaks, listens, and gives you feedback on your answers, tone, and pacing.
+                  </p>
+                  <Button onClick={onGetStarted} variant="outline" className="mt-4">
+                     Try Interview Sim
+                  </Button>
+               </div>
+               <div className="relative">
+                  <div className="absolute inset-0 bg-purple-600 blur-3xl opacity-10 rounded-full" />
+                  <Card className="relative p-8 shadow-2xl border-slate-200">
+                     <div className="flex items-center justify-center h-48 bg-slate-50 rounded-2xl mb-6 border border-slate-100 relative overflow-hidden">
+                        <div className="absolute inset-0 flex items-center justify-center gap-1">
+                           {[1,2,3,4,5].map(i => (
+                              <motion.div 
+                                 key={i}
+                                 animate={{ height: [20, 40 + Math.random()*40, 20] }}
+                                 transition={{ repeat: Infinity, duration: 1 }}
+                                 className="w-2 bg-purple-500 rounded-full"
+                              />
+                           ))}
+                        </div>
+                     </div>
+                     <div className="space-y-3">
+                        <div className="flex gap-3 items-start">
+                           <div className="w-8 h-8 rounded-full bg-slate-200 flex-none" />
+                           <div className="bg-slate-100 p-3 rounded-r-xl rounded-bl-xl text-sm text-slate-600">
+                              Can you describe a challenging project you managed?
+                           </div>
+                        </div>
+                        <div className="flex gap-3 items-start flex-row-reverse">
+                           <div className="w-8 h-8 rounded-full bg-brand-600 flex-none" />
+                           <div className="bg-brand-50 p-3 rounded-l-xl rounded-br-xl text-sm text-brand-900">
+                              Yes, in my last role I led a cross-functional team...
+                           </div>
+                        </div>
+                     </div>
+                  </Card>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      {/* Testimonials */}
+      <div id="testimonials" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 font-display">Everything you need to get hired fast.</h2>
-            <p className="text-lg text-slate-500">Stop guessing what recruiters want. Our AI tools guide you through every step of the process.</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 font-display">Don't just take our word for it.</h2>
           </div>
-
           <div className="grid md:grid-cols-3 gap-8">
-            <FeatureCard 
-              icon={<FileText className="w-6 h-6 text-brand-600" />}
-              title="Resume Intelligence"
-              desc="Get instant feedback on your resume. We simulate top ATS algorithms to score your content."
-            />
-            <FeatureCard 
-              icon={<Mic className="w-6 h-6 text-purple-600" />}
-              title="Live Interview Sim"
-              desc="Practice voice-to-voice with an AI hiring manager. Receive transcripts and performance coaching."
-            />
-            <FeatureCard 
-              icon={<TrendingUp className="w-6 h-6 text-emerald-600" />}
-              title="Smart Job Match"
-              desc="Find jobs that match your skills perfectly. We analyze descriptions to highlight your gaps."
-            />
+             {[
+               {
+                 quote: "I applied to 50 jobs with no response. After using CareerMint, I got 3 interviews in a week.",
+                 author: "Sarah J.",
+                 role: "Marketing Manager",
+                 company: "Spotify"
+               },
+               {
+                 quote: "The interview simulator is scary accurate. It asked the exact questions I got in my real interview.",
+                 author: "Michael C.",
+                 role: "Software Engineer",
+                 company: "Google"
+               },
+               {
+                 quote: "Finally, a tool that actually helps you improve your resume instead of just formatting it.",
+                 author: "Jessica L.",
+                 role: "Product Owner",
+                 company: "Airbnb"
+               }
+             ].map((t, i) => (
+               <Card key={i} className="p-8 hover:shadow-lg transition-shadow bg-slate-50 border-transparent">
+                  <div className="flex gap-1 mb-4">
+                     {[1,2,3,4,5].map(star => <Star key={star} className="w-4 h-4 text-yellow-400 fill-current" />)}
+                  </div>
+                  <p className="text-slate-700 text-lg mb-6 leading-relaxed">"{t.quote}"</p>
+                  <div>
+                     <p className="font-bold text-slate-900">{t.author}</p>
+                     <p className="text-sm text-slate-500">{t.role} at {t.company}</p>
+                  </div>
+               </Card>
+             ))}
           </div>
         </div>
       </div>
 
-      <footer className="py-12 border-t border-slate-200 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-brand-600 rounded flex items-center justify-center">
-              <span className="font-bold text-xs text-white">C</span>
+      {/* CTA */}
+      <div className="py-24 bg-white">
+         <div className="max-w-5xl mx-auto px-6">
+            <div className="bg-brand-600 rounded-3xl p-12 md:p-20 text-center relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+               <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2" />
+               
+               <h2 className="text-3xl md:text-5xl font-bold text-white mb-8 relative z-10 font-display">Ready to accelerate your career?</h2>
+               <p className="text-brand-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 relative z-10">
+                  Join thousands of professionals who are landing better jobs, faster.
+               </p>
+               <Button onClick={onGetStarted} size="xl" variant="secondary" className="relative z-10 shadow-2xl">
+                  Start For Free <ArrowRight className="w-5 h-5 ml-2" />
+               </Button>
+               <p className="mt-6 text-brand-200 text-sm font-medium relative z-10">No credit card required · Cancel anytime</p>
             </div>
-            <span className="font-bold text-sm text-slate-900">CareerMint AI</span>
+         </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="py-12 border-t border-slate-100 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+           <div className="grid md:grid-cols-4 gap-8 mb-12">
+              <div className="col-span-1 md:col-span-2">
+                 <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+                       <span className="font-bold text-white text-lg font-display">C</span>
+                    </div>
+                    <span className="font-bold text-xl text-slate-900 font-display">CareerMint</span>
+                 </div>
+                 <p className="text-slate-500 max-w-xs leading-relaxed">
+                    Empowering job seekers with AI-driven tools to land their dream roles.
+                 </p>
+              </div>
+              <div>
+                 <h4 className="font-bold text-slate-900 mb-4">Product</h4>
+                 <ul className="space-y-2 text-slate-500">
+                    <li><a href="#" className="hover:text-brand-600">Resume Builder</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Interview Prep</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Job Match</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Pricing</a></li>
+                 </ul>
+              </div>
+              <div>
+                 <h4 className="font-bold text-slate-900 mb-4">Company</h4>
+                 <ul className="space-y-2 text-slate-500">
+                    <li><a href="#" className="hover:text-brand-600">About</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Blog</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Careers</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Contact</a></li>
+                 </ul>
+              </div>
            </div>
-           <div className="flex gap-6 text-sm text-slate-500 font-medium">
-             <a href="#" className="hover:text-brand-600">Privacy</a>
-             <a href="#" className="hover:text-brand-600">Terms</a>
-             <a href="#" className="hover:text-brand-600">Support</a>
+           <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+              <p className="text-slate-400 text-sm">© 2025 CareerMint AI. All rights reserved.</p>
+              <div className="flex gap-6 text-sm text-slate-500">
+                 <a href="#" className="hover:text-brand-600">Privacy Policy</a>
+                 <a href="#" className="hover:text-brand-600">Terms of Service</a>
+              </div>
            </div>
-           <p className="text-slate-400 text-sm">© 2025 CareerMint Inc.</p>
         </div>
       </footer>
     </div>
   );
 };
-
-const FeatureCard = ({ icon, title, desc }: any) => (
-  <div className="p-8 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
-    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-brand-50 transition-colors">
-      {icon}
-    </div>
-    <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-    <p className="text-slate-500 leading-relaxed">{desc}</p>
-  </div>
-);
 
 export default LandingPage;
