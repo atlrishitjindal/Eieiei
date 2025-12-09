@@ -10,7 +10,7 @@ import Dashboard from './components/Dashboard';
 import Jobs from './components/Jobs';
 import CoverLetter from './components/CoverLetter';
 import { AppView, ResumeAnalysis, ActivityLog } from './types';
-import { v4 as uuidv4 } from 'uuid'; // Actually we don't have uuid package, use simple id gen
+import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
   const [user, setUser] = useState<{name: string, email: string} | null>(null);
@@ -69,7 +69,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950">
+    <div className="flex h-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans">
       <Sidebar 
         currentView={currentView}
         setCurrentView={setCurrentView}
@@ -78,60 +78,71 @@ function App() {
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 flex flex-col min-w-0 h-full relative transition-all">
+      <main className="flex-1 flex flex-col min-w-0 h-full relative">
         {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-10">
+        <div className="md:hidden flex items-center justify-between p-4 bg-zinc-950/80 backdrop-blur border-b border-zinc-800 sticky top-0 z-20">
           <div className="flex items-center gap-3">
-             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-400 hover:bg-slate-800 rounded-lg">
-               {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-zinc-400 hover:bg-zinc-900 rounded-lg">
+               {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
              </button>
-             <span className="font-bold text-white">CareerCraft</span>
+             <span className="font-bold text-white tracking-tight">CareerCraft</span>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          {currentView === AppView.DASHBOARD && (
-             <Dashboard 
-               user={user!} 
-               setCurrentView={setCurrentView} 
-               resumeAnalysis={resumeAnalysis}
-               activities={activities}
-             />
-          )}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 scroll-smooth">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentView}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              {currentView === AppView.DASHBOARD && (
+                 <Dashboard 
+                   user={user!} 
+                   setCurrentView={setCurrentView} 
+                   resumeAnalysis={resumeAnalysis}
+                   activities={activities}
+                 />
+              )}
 
-          {currentView === AppView.INTERVIEW && (
-            <LiveInterview 
-              resumeAnalysis={resumeAnalysis} 
-            />
-          )}
-          
-          {currentView === AppView.RESUME && (
-            <ResumeAnalyzer 
-              analysisResult={resumeAnalysis}
-              onAnalysisComplete={(result) => {
-                setResumeAnalysis(result);
-                addActivity("Resume Analysis", `Scored ${result.score}/100`);
-              }}
-              onActivity={addActivity}
-            />
-          )}
-          
-          {currentView === AppView.INSIGHTS && <MarketInsights />}
-          
-          {currentView === AppView.JOBS && (
-            <Jobs 
-              resumeAnalysis={resumeAnalysis} 
-              onActivity={addActivity}
-            />
-          )}
-          
-          {currentView === AppView.COVER_LETTER && (
-            <CoverLetter 
-              resumeAnalysis={resumeAnalysis} 
-              onActivity={addActivity}
-            />
-          )}
+              {currentView === AppView.INTERVIEW && (
+                <LiveInterview 
+                  resumeAnalysis={resumeAnalysis} 
+                />
+              )}
+              
+              {currentView === AppView.RESUME && (
+                <ResumeAnalyzer 
+                  analysisResult={resumeAnalysis}
+                  onAnalysisComplete={(result) => {
+                    setResumeAnalysis(result);
+                    addActivity("Resume Analysis", `Scored ${result.score}/100`);
+                  }}
+                  onActivity={addActivity}
+                />
+              )}
+              
+              {currentView === AppView.INSIGHTS && <MarketInsights />}
+              
+              {currentView === AppView.JOBS && (
+                <Jobs 
+                  resumeAnalysis={resumeAnalysis} 
+                  onActivity={addActivity}
+                />
+              )}
+              
+              {currentView === AppView.COVER_LETTER && (
+                <CoverLetter 
+                  resumeAnalysis={resumeAnalysis} 
+                  onActivity={addActivity}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

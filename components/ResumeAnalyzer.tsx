@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Award, Zap, TrendingUp, Lightbulb, ChevronRight } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, TrendingUp, Lightbulb, ChevronDown } from 'lucide-react';
 import { analyzeResume, generateImprovementExample } from '../services/gemini';
 import { ResumeAnalysis } from '../types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, Button, Badge } from './ui/DesignSystem';
+import { cn, containerVariants, itemVariants } from '../lib/utils';
 
 interface ResumeAnalyzerProps {
   analysisResult: ResumeAnalysis | null;
@@ -15,7 +18,6 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Interactive example state
   const [activeExampleIndex, setActiveExampleIndex] = useState<number | null>(null);
   const [exampleLoading, setExampleLoading] = useState(false);
   const [examples, setExamples] = useState<Record<number, string>>({});
@@ -24,32 +26,26 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      // Reset logic handled by parent state update essentially, but strictly we clear local previews
       setExamples({});
       setActiveExampleIndex(null);
 
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
+      reader.onloadend = () => setPreview(reader.result as string);
       reader.readAsDataURL(selectedFile);
     }
   };
 
   const handleAnalyze = async () => {
     if (!file || !preview) return;
-    
     setIsAnalyzing(true);
     setError(null);
-    
     try {
       const base64Data = preview.split(',')[1];
       const analysis = await analyzeResume(base64Data, file.type);
       onAnalysisComplete(analysis);
       onActivity("Resume Analysis", `Scored ${analysis.score}/100`);
     } catch (err: any) {
-      console.error(err);
-      setError("Failed to analyze resume. Please ensure it's a clear file.");
+      setError("Failed to analyze resume. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -60,15 +56,12 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
       setActiveExampleIndex(null);
       return;
     }
-    
     setActiveExampleIndex(index);
     if (!examples[index]) {
       setExampleLoading(true);
       try {
-        const example = await generateImprovementExample(improvement, analysisResult?.summary || "General Context");
+        const example = await generateImprovementExample(improvement, analysisResult?.summary || "");
         setExamples(prev => ({ ...prev, [index]: example }));
-      } catch (err) {
-        setExamples(prev => ({ ...prev, [index]: "Could not generate example." }));
       } finally {
         setExampleLoading(false);
       }
@@ -76,182 +69,128 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold text-white">AI Resume Optimizer</h2>
-        <p className="text-slate-400 max-w-2xl mx-auto">
-          Upload your resume. Our AI will score it, identify gaps, and provide actionable improvements instantly.
-        </p>
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="max-w-4xl mx-auto space-y-8">
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold text-white tracking-tight">Resume Optimizer</h2>
+        <p className="text-zinc-400">Upload your resume to receive an ATS score and actionable feedback.</p>
       </div>
 
       {!analysisResult && (
-        <div className="bg-slate-900 rounded-2xl shadow-sm border-2 border-dashed border-slate-700 p-12 text-center transition-all hover:border-blue-500 hover:bg-slate-900/80 group">
+        <Card className="border-dashed border-2 border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900/50 hover:border-zinc-700 transition-all p-12 flex flex-col items-center justify-center text-center cursor-pointer relative group">
           <input
             type="file"
-            id="resume-upload"
-            className="hidden"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             accept="image/png, image/jpeg, image/jpg, application/pdf"
             onChange={handleFileChange}
           />
-          <label htmlFor="resume-upload" className="cursor-pointer flex flex-col items-center gap-4">
-            {preview ? (
-              <div className="relative group-hover:opacity-90 transition-opacity">
-                {file?.type === 'application/pdf' ? (
-                  <div className="w-64 h-64 bg-slate-950 rounded-lg border border-slate-700 flex flex-col items-center justify-center p-4 shadow-lg">
-                    <FileText className="w-16 h-16 text-red-500 mb-4" />
-                    <p className="text-sm font-medium text-slate-300 text-center break-all line-clamp-3">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-2">PDF Document</p>
-                  </div>
-                ) : (
-                  <img src={preview} alt="Resume Preview" className="h-64 object-contain shadow-lg rounded-lg border border-slate-800" />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 group-hover:opacity-100 rounded-lg transition-opacity font-medium">
-                  Change File
-                </div>
-              </div>
-            ) : (
-              <div className="w-20 h-20 bg-slate-800 text-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-inner">
-                <Upload className="w-8 h-8" />
-              </div>
-            )}
-            
-            {!preview && (
-              <>
-                <h3 className="text-xl font-semibold text-white">Click to Upload Resume</h3>
-                <p className="text-slate-500 text-sm">Supports PDF, JPG, PNG (Max 5MB)</p>
-              </>
-            )}
-          </label>
+          <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+            {preview ? <FileText className="w-8 h-8 text-blue-400" /> : <Upload className="w-8 h-8 text-zinc-400" />}
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-white">
+              {file ? file.name : "Drop your resume here"}
+            </h3>
+            <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+              Supports PDF and Image formats up to 10MB.
+            </p>
+          </div>
 
           {file && !isAnalyzing && (
-            <div className="mt-8">
-              <button
-                onClick={handleAnalyze}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-full font-semibold shadow-lg shadow-blue-900/20 transition-all hover:scale-105 flex items-center gap-2 mx-auto"
-              >
-                <Zap className="w-5 h-5" />
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 z-20 relative pointer-events-none">
+              <Button onClick={(e) => { e.stopPropagation(); handleAnalyze(); }} className="pointer-events-auto">
                 Analyze Resume
-              </button>
-            </div>
+              </Button>
+            </motion.div>
           )}
 
           {isAnalyzing && (
-             <div className="mt-8 flex flex-col items-center text-blue-400">
-               <Loader2 className="w-8 h-8 animate-spin mb-2" />
-               <p className="font-medium">Reading and Analyzing...</p>
+             <div className="mt-8 flex items-center gap-2 text-blue-400 font-medium">
+               <Loader2 className="w-4 h-4 animate-spin" /> Processing...
              </div>
           )}
-          
-          {error && <p className="mt-4 text-red-400 font-medium">{error}</p>}
-        </div>
+          {error && <p className="mt-4 text-red-400 text-sm font-medium">{error}</p>}
+        </Card>
       )}
 
       {analysisResult && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Score Card */}
-          <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 flex flex-col md:flex-row gap-8 items-center">
-            <div className="flex-none relative w-32 h-32 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-800" />
-                <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="12" fill="transparent" 
-                  strokeDasharray={351.86} 
-                  strokeDashoffset={351.86 - (351.86 * analysisResult.score) / 100}
-                  className={`transition-all duration-1000 ease-out ${analysisResult.score > 80 ? 'text-green-500' : analysisResult.score > 60 ? 'text-yellow-500' : 'text-red-500'}`} 
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-                <span className="text-3xl font-bold">{analysisResult.score}</span>
-                <span className="text-xs uppercase tracking-wider text-slate-500">ATS Score</span>
-              </div>
-            </div>
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-2xl font-bold text-white">Executive Summary</h3>
-                <span className="bg-blue-900/30 text-blue-400 border border-blue-900/50 px-3 py-0.5 rounded-full text-sm font-semibold">AI Generated</span>
-              </div>
-              <p className="text-slate-400 leading-relaxed">{analysisResult.summary}</p>
-            </div>
-          </div>
+        <div className="space-y-6">
+          <motion.div variants={itemVariants} className="grid md:grid-cols-3 gap-6">
+            <Card className="col-span-1 flex flex-col items-center justify-center p-8 bg-zinc-900/50">
+               <div className="relative w-32 h-32 flex items-center justify-center">
+                  <svg className="w-full h-full -rotate-90">
+                    <circle cx="64" cy="64" r="56" stroke="#27272a" strokeWidth="8" fill="transparent" />
+                    <circle cx="64" cy="64" r="56" stroke={analysisResult.score > 75 ? "#10b981" : analysisResult.score > 50 ? "#f59e0b" : "#ef4444"} strokeWidth="8" fill="transparent" strokeDasharray={351.86} strokeDashoffset={351.86 - (351.86 * analysisResult.score) / 100} className="transition-all duration-1000 ease-out" strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-4xl font-bold text-white tracking-tighter">{analysisResult.score}</span>
+                  </div>
+               </div>
+               <p className="mt-4 font-medium text-zinc-300">ATS Score</p>
+            </Card>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Strengths */}
-            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-6">
-              <div className="flex items-center gap-2 mb-4 text-green-400">
-                <CheckCircle className="w-6 h-6" />
-                <h3 className="font-bold text-lg text-white">Strengths</h3>
+            <Card className="col-span-2 space-y-4">
+              <h3 className="font-semibold text-zinc-200">Executive Summary</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed">{analysisResult.summary}</p>
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-zinc-800/50">
+                {analysisResult.skills.slice(0, 8).map((skill, i) => (
+                  <Badge key={i} variant="neutral">{skill}</Badge>
+                ))}
+                {analysisResult.skills.length > 8 && <Badge variant="neutral">+{analysisResult.skills.length - 8}</Badge>}
               </div>
-              <ul className="space-y-3">
+            </Card>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <motion.div variants={itemVariants} className="space-y-4">
+              <h3 className="font-semibold text-zinc-200 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-500" /> Key Strengths
+              </h3>
+              <div className="space-y-3">
                 {analysisResult.strengths.map((item, i) => (
-                  <li key={i} className="flex gap-3 text-slate-300 text-sm">
-                    <span className="flex-none w-1.5 h-1.5 rounded-full bg-green-500 mt-2" />
-                    {item}
-                  </li>
+                  <Card key={i} className="p-4 border-emerald-500/10 bg-emerald-500/5 flex items-start gap-3">
+                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 flex-none" />
+                    <p className="text-sm text-zinc-300">{item}</p>
+                  </Card>
                 ))}
-              </ul>
-            </div>
-
-            {/* Weaknesses */}
-            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-6">
-              <div className="flex items-center gap-2 mb-4 text-amber-400">
-                <AlertCircle className="w-6 h-6" />
-                <h3 className="font-bold text-lg text-white">ATS Gaps</h3>
               </div>
-              <ul className="space-y-3">
-                {analysisResult.weaknesses.map((item, i) => (
-                  <li key={i} className="flex gap-3 text-slate-300 text-sm">
-                    <span className="flex-none w-1.5 h-1.5 rounded-full bg-amber-500 mt-2" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            </motion.div>
 
-            {/* Improvements with Interactive Examples */}
-            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-6">
-              <div className="flex items-center gap-2 mb-4 text-blue-400">
-                <TrendingUp className="w-6 h-6" />
-                <h3 className="font-bold text-lg text-white">Improvements</h3>
-              </div>
-              <ul className="space-y-4">
+            <motion.div variants={itemVariants} className="space-y-4">
+              <h3 className="font-semibold text-zinc-200 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-500" /> Suggested Improvements
+              </h3>
+              <div className="space-y-3">
                 {analysisResult.improvements.map((item, i) => (
-                  <li key={i} className="text-slate-300 text-sm">
-                    <div className="flex gap-3 mb-2">
-                      <span className="flex-none w-1.5 h-1.5 rounded-full bg-blue-500 mt-2" />
-                      <span>{item}</span>
-                    </div>
-                    
-                    <button
-                      onClick={() => handleShowExample(i, item)}
-                      className="ml-5 text-blue-400 text-xs font-semibold flex items-center gap-1 hover:text-blue-300 transition-colors"
-                    >
-                      <Lightbulb className="w-3 h-3" />
-                      {activeExampleIndex === i ? 'Hide Example' : 'See Example'}
-                      <ChevronRight className={`w-3 h-3 transition-transform ${activeExampleIndex === i ? 'rotate-90' : ''}`} />
-                    </button>
-
-                    {activeExampleIndex === i && (
-                      <div className="ml-5 mt-2 p-3 bg-slate-950 border border-slate-800 rounded-lg animate-in slide-in-from-top-2">
-                         {exampleLoading && !examples[i] ? (
-                           <div className="flex items-center gap-2 text-slate-500">
-                             <Loader2 className="w-3 h-3 animate-spin" /> Generating...
-                           </div>
-                         ) : (
-                           <div className="text-slate-400 italic">
-                             "{examples[i]}"
-                           </div>
-                         )}
+                  <div key={i} className="group">
+                    <Card className="p-4 border-blue-500/10 bg-blue-500/5 hover:border-blue-500/30 transition-colors cursor-pointer" onClick={() => handleShowExample(i, item)}>
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex gap-3">
+                           <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 flex-none" />
+                           <p className="text-sm text-zinc-300">{item}</p>
+                        </div>
+                        <ChevronDown className={cn("w-4 h-4 text-blue-400 transition-transform", activeExampleIndex === i ? "rotate-180" : "")} />
                       </div>
-                    )}
-                  </li>
+                      
+                      <AnimatePresence>
+                        {activeExampleIndex === i && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                             <div className="mt-3 pt-3 border-t border-blue-500/20 text-xs text-blue-300 bg-blue-900/20 p-3 rounded">
+                               <div className="flex items-center gap-2 mb-1 font-semibold"><Lightbulb className="w-3 h-3" /> AI Suggestion:</div>
+                               {exampleLoading && !examples[i] ? "Generating example..." : examples[i]}
+                             </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </Card>
+                  </div>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
