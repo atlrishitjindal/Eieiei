@@ -5,8 +5,8 @@ import { Loader2 } from 'lucide-react';
 
 // --- BUTTONS ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'link';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   isLoading?: boolean;
 }
 
@@ -19,25 +19,27 @@ export const Button: React.FC<ButtonProps> = ({
   disabled, 
   ...props 
 }) => {
-  const baseStyles = "inline-flex items-center justify-center font-medium transition-all duration-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-950 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyles = "inline-flex items-center justify-center font-semibold transition-all duration-200 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
   
   const variants = {
-    primary: "bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20 border border-blue-500/50",
-    secondary: "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 border border-zinc-700",
-    outline: "bg-transparent text-zinc-300 border border-zinc-700 hover:border-zinc-500 hover:text-white",
-    ghost: "bg-transparent text-zinc-400 hover:text-white hover:bg-zinc-800/50",
-    danger: "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20"
+    primary: "bg-brand-600 text-white hover:bg-brand-700 shadow-md shadow-brand-600/20 border border-transparent",
+    secondary: "bg-white text-slate-700 hover:text-brand-700 hover:border-brand-200 border border-slate-200 shadow-sm",
+    outline: "bg-transparent text-slate-600 border border-slate-300 hover:border-brand-500 hover:text-brand-600",
+    ghost: "bg-transparent text-slate-600 hover:text-brand-700 hover:bg-brand-50",
+    danger: "bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300",
+    link: "bg-transparent text-brand-600 underline-offset-4 hover:underline p-0 h-auto"
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base"
+    sm: "px-4 py-1.5 text-xs",
+    md: "px-6 py-2.5 text-sm",
+    lg: "px-8 py-3 text-base",
+    xl: "px-10 py-4 text-lg"
   };
 
   return (
     <motion.button
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.99 }}
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={isLoading || disabled}
       {...props}
@@ -50,7 +52,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 // --- CARDS ---
 export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, children, ...props }) => (
-  <div className={cn("glass-card rounded-xl p-6", className)} {...props}>
+  <div className={cn("bg-white rounded-xl border border-slate-200 shadow-card hover:shadow-soft transition-shadow duration-300", className)} {...props}>
     {children}
   </div>
 );
@@ -60,7 +62,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
   ({ className, ...props }, ref) => (
     <input
       className={cn(
-        "flex h-10 w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all",
+        "flex h-11 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all disabled:bg-slate-50 disabled:text-slate-500",
         className
       )}
       ref={ref}
@@ -70,22 +72,38 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
 );
 Input.displayName = "Input";
 
+// --- TEXTAREA ---
+export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  ({ className, ...props }, ref) => (
+    <textarea
+      className={cn(
+        "flex min-h-[100px] w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all disabled:bg-slate-50",
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  )
+);
+Textarea.displayName = "Textarea";
+
 // --- BADGES ---
 interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'success' | 'warning' | 'error' | 'info' | 'neutral';
+  variant?: 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'brand';
 }
 
 export const Badge: React.FC<BadgeProps> = ({ className, variant = 'neutral', children, ...props }) => {
   const variants = {
-    success: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    warning: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    error: "bg-red-500/10 text-red-400 border-red-500/20",
-    info: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    neutral: "bg-zinc-800/50 text-zinc-400 border-zinc-700",
+    success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    warning: "bg-amber-50 text-amber-700 border-amber-200",
+    error: "bg-red-50 text-red-700 border-red-200",
+    info: "bg-sky-50 text-sky-700 border-sky-200",
+    neutral: "bg-slate-100 text-slate-600 border-slate-200",
+    brand: "bg-brand-50 text-brand-700 border-brand-200"
   };
   
   return (
-    <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2", variants[variant], className)} {...props}>
+    <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors", variants[variant], className)} {...props}>
       {children}
     </div>
   );

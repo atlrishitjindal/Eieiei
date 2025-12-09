@@ -133,8 +133,6 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
             scriptProcessor.connect(inputCtx.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
-             // Logic handles transcripts & audio playback (omitted for brevity, same as original logic but cleaner code style if fully rewritten)
-             // Keeping original logic for audio handling to ensure safety, just updating UI wrapper.
              let userSpeaking = false;
              let modelSpeaking = false;
              if (message.serverContent?.outputTranscription) {
@@ -204,21 +202,21 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   }, [stopSession]);
 
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col lg:flex-row gap-6">
+    <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6">
       {/* Left Panel: Active Session */}
       <div className="flex-1 flex flex-col gap-6 overflow-hidden">
         <div className="flex-none">
-          <h2 className="text-2xl font-bold text-white tracking-tight">Interview Simulator</h2>
-          <p className="text-zinc-400">Practice behavioral questions with real-time feedback.</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight font-display">Interview Simulator</h2>
+          <p className="text-slate-500">Practice with our AI hiring manager. We'll analyze your responses.</p>
         </div>
 
-        <Card className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-zinc-900 border-zinc-800">
+        <Card className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-white shadow-lg border-slate-200">
           {/* Visualizer Background */}
           {isActive && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                <motion.div 
                 animate={{ scale: [1, 1 + currentInputVolume * 0.05, 1], opacity: [0.1, 0.2, 0.1] }}
-                className="w-96 h-96 rounded-full bg-blue-500 blur-3xl"
+                className="w-96 h-96 rounded-full bg-brand-100 blur-3xl"
                />
             </div>
           )}
@@ -226,23 +224,23 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
           <div className="relative z-10 text-center space-y-8">
             <div className="h-32 flex items-center justify-center">
               {isConnecting ? (
-                <div className="flex flex-col items-center gap-3 text-blue-400">
+                <div className="flex flex-col items-center gap-3 text-brand-600">
                   <Loader2 className="w-8 h-8 animate-spin" />
-                  <span className="font-medium">Establishing secure connection...</span>
+                  <span className="font-medium">Connecting to AI Interviewer...</span>
                 </div>
               ) : isActive ? (
                 <div className="relative">
-                   <div className="w-24 h-24 rounded-full bg-zinc-950 border-4 border-zinc-800 flex items-center justify-center shadow-2xl relative z-10">
-                     <Mic className="w-10 h-10 text-emerald-500" />
+                   <div className="w-24 h-24 rounded-full bg-white border-4 border-brand-100 flex items-center justify-center shadow-2xl relative z-10">
+                     <Mic className="w-10 h-10 text-brand-600" />
                    </div>
                    <motion.div 
                      animate={{ scale: 1.5, opacity: 0 }} 
                      transition={{ repeat: Infinity, duration: 2 }}
-                     className="absolute inset-0 bg-emerald-500/20 rounded-full"
+                     className="absolute inset-0 bg-brand-200 rounded-full"
                    />
                 </div>
               ) : (
-                <div className="w-24 h-24 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600">
+                <div className="w-24 h-24 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
                   <MicOff className="w-10 h-10" />
                 </div>
               )}
@@ -250,11 +248,11 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
 
             <div className="flex gap-4 justify-center">
                {!isActive ? (
-                 <Button onClick={startSession} disabled={isConnecting} variant="primary" size="lg" className="rounded-full px-8">
+                 <Button onClick={startSession} disabled={isConnecting} variant="primary" size="lg" className="rounded-full px-8 shadow-xl shadow-brand-500/20">
                    <Play className="w-5 h-5 mr-2" /> Start Interview
                  </Button>
                ) : (
-                 <Button onClick={stopSession} variant="danger" size="lg" className="rounded-full px-8">
+                 <Button onClick={stopSession} variant="danger" size="lg" className="rounded-full px-8 shadow-sm">
                    <Square className="w-5 h-5 mr-2 fill-current" /> End Session
                  </Button>
                )}
@@ -267,29 +265,29 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                )}
             </div>
             
-            {error && <p className="text-red-400 text-sm font-medium">{error}</p>}
+            {error && <p className="text-red-500 text-sm font-medium bg-red-50 px-3 py-1 rounded-full inline-block">{error}</p>}
           </div>
         </Card>
 
         {/* Report Panel */}
         {report && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex-none">
-            <Card className="border-zinc-800 bg-zinc-900/50 p-6">
+            <Card className="border-slate-200 bg-white p-6 shadow-md">
                <div className="flex items-center justify-between mb-6">
-                 <h3 className="text-lg font-bold text-white">Performance Report</h3>
-                 <Badge variant="info" className="text-lg px-3 py-1">{report.overallScore}/100</Badge>
+                 <h3 className="text-lg font-bold text-slate-900">Performance Report</h3>
+                 <Badge variant="info" className="text-lg px-3 py-1">Score: {report.overallScore}/100</Badge>
                </div>
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-2 gap-6">
                  <div>
-                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Strengths</span>
-                   <ul className="mt-2 space-y-1 text-sm text-zinc-400">
-                     {report.strengths.slice(0,3).map((s,i) => <li key={i} className="flex gap-2"><CheckCircle className="w-3 h-3 mt-1 text-emerald-500 flex-none"/> {s}</li>)}
+                   <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block mb-2">Strengths</span>
+                   <ul className="space-y-2 text-sm text-slate-600">
+                     {report.strengths.slice(0,3).map((s,i) => <li key={i} className="flex gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 flex-none mt-0.5"/> {s}</li>)}
                    </ul>
                  </div>
                  <div>
-                   <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Improvements</span>
-                   <ul className="mt-2 space-y-1 text-sm text-zinc-400">
-                     {report.improvements.slice(0,3).map((s,i) => <li key={i} className="flex gap-2"><BarChart className="w-3 h-3 mt-1 text-amber-500 flex-none"/> {s}</li>)}
+                   <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block mb-2">Improvements</span>
+                   <ul className="space-y-2 text-sm text-slate-600">
+                     {report.improvements.slice(0,3).map((s,i) => <li key={i} className="flex gap-2"><BarChart className="w-4 h-4 text-amber-500 flex-none mt-0.5"/> {s}</li>)}
                    </ul>
                  </div>
                </div>
@@ -299,25 +297,25 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
       </div>
 
       {/* Right Panel: Transcript */}
-      <Card className="w-full lg:w-96 flex flex-col h-full bg-zinc-900/50 border-zinc-800/50 p-0 overflow-hidden">
-        <div className="p-4 border-b border-zinc-800 bg-zinc-900">
-          <h3 className="font-medium text-zinc-200 text-sm">Live Transcript</h3>
+      <Card className="w-full lg:w-96 flex flex-col h-full bg-white border-slate-200 p-0 overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-slate-100 bg-slate-50">
+          <h3 className="font-semibold text-slate-700 text-sm">Live Transcript</h3>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
           {transcripts.map((msg, idx) => (
             <div key={idx} className={cn("flex flex-col max-w-[85%]", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
               <div className={cn(
-                "px-3 py-2 rounded-2xl text-sm",
-                msg.role === 'user' ? "bg-blue-600 text-white rounded-tr-sm" : "bg-zinc-800 text-zinc-200 rounded-tl-sm border border-zinc-700"
+                "px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm",
+                msg.role === 'user' ? "bg-brand-600 text-white rounded-tr-sm" : "bg-slate-100 text-slate-700 rounded-tl-sm"
               )}>
                 {msg.text}
               </div>
-              <span className="text-[10px] text-zinc-500 mt-1 capitalize">{msg.role}</span>
+              <span className="text-[10px] text-slate-400 mt-1 capitalize font-medium">{msg.role}</span>
             </div>
           ))}
           {interimTranscript && (
              <div className={cn("flex flex-col max-w-[85%] animate-pulse", interimTranscript.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
-               <div className={cn("px-3 py-2 rounded-2xl text-sm opacity-70", interimTranscript.role === 'user' ? "bg-blue-600" : "bg-zinc-800")}>
+               <div className={cn("px-4 py-2.5 rounded-2xl text-sm opacity-70", interimTranscript.role === 'user' ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700")}>
                  {interimTranscript.text} ...
                </div>
              </div>

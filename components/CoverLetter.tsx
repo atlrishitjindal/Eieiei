@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Mail, Loader2, Copy, Check, FileText } from 'lucide-react';
+import { Mail, Loader2, Copy, Check, FileText, ArrowRight } from 'lucide-react';
 import { ResumeAnalysis } from '../types';
 import { generateCoverLetter } from '../services/gemini';
+import { Card, Button, Textarea } from './ui/DesignSystem';
 
 interface CoverLetterProps {
   resumeAnalysis: ResumeAnalysis | null;
@@ -37,77 +38,83 @@ const CoverLetter: React.FC<CoverLetterProps> = ({ resumeAnalysis, onActivity })
 
   if (!resumeAnalysis) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-8 bg-slate-900 rounded-2xl border border-slate-800">
-        <FileText className="w-16 h-16 text-slate-700 mb-4" />
-        <h3 className="text-xl font-bold text-white mb-2">Resume Required</h3>
-        <p className="text-slate-400 max-w-md">
-          Please upload your resume first. We need your background to write a tailored cover letter.
-        </p>
-      </div>
+      <Card className="flex flex-col items-center justify-center min-h-[400px] text-center p-12 shadow-none border border-slate-200">
+        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+           <Mail className="w-8 h-8 text-slate-400" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">Resume Required</h3>
+        <p className="text-slate-500 max-w-md">Please upload your resume first. We use it to personalize your cover letter.</p>
+      </Card>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8 h-[calc(100vh-8rem)]">
+    <div className="grid lg:grid-cols-2 gap-8 h-[calc(100vh-8rem)]">
       {/* Input Side */}
-      <div className="flex flex-col space-y-4">
+      <div className="flex flex-col space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">Cover Letter Generator</h2>
-          <p className="text-slate-400 text-sm">Paste a job description. We'll write a persuasive letter connecting your resume to their needs.</p>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2 font-display">Cover Letter Writer</h2>
+          <p className="text-slate-500">Paste the job description below. We'll craft a compelling story connecting your resume to their requirements.</p>
         </div>
 
-        <div className="flex-1 flex flex-col">
-          <label className="text-sm font-medium text-slate-300 mb-2">Job Description</label>
-          <textarea
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
-            className="flex-1 w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
-            placeholder="Paste the full job description here..."
-          />
-        </div>
+        <Card className="flex-1 flex flex-col p-1 shadow-sm">
+           <div className="p-3 border-b border-slate-100 bg-slate-50 rounded-t-lg">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Job Description</label>
+           </div>
+           <Textarea
+             value={jobDescription}
+             onChange={(e) => setJobDescription(e.target.value)}
+             className="flex-1 w-full border-0 focus:ring-0 resize-none p-4 text-base rounded-b-lg"
+             placeholder="Paste the full job listing here..."
+           />
+        </Card>
 
-        <button
+        <Button
           onClick={handleGenerate}
           disabled={isGenerating || !jobDescription.trim()}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-900/20 transition-all hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2"
+          size="lg"
+          className="w-full shadow-lg shadow-brand-600/20"
         >
           {isGenerating ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" /> Writing Magic...
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Writing your letter...
             </>
           ) : (
             <>
-              <Mail className="w-5 h-5" /> Generate Letter
+              Generate Letter <ArrowRight className="w-5 h-5 ml-2" />
             </>
           )}
-        </button>
+        </Button>
       </div>
 
       {/* Output Side */}
-      <div className="flex flex-col h-full bg-slate-50 text-slate-900 rounded-xl shadow-2xl overflow-hidden relative">
-        <div className="bg-slate-200 border-b border-slate-300 p-4 flex items-center justify-between">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-400" />
-            <div className="w-3 h-3 rounded-full bg-yellow-400" />
-            <div className="w-3 h-3 rounded-full bg-green-400" />
+      <div className="flex flex-col h-full bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+        <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-500">
+             <FileText className="w-4 h-4" />
+             <span className="text-sm font-medium">Draft Preview</span>
           </div>
-          <span className="text-xs font-semibold text-slate-500 uppercase">Preview</span>
-          <button 
+          <Button 
+            variant="ghost" 
+            size="sm"
             onClick={copyToClipboard}
             disabled={!generatedLetter}
-            className="text-slate-600 hover:text-blue-600 transition-colors"
-            title="Copy to Clipboard"
+            className={copied ? "text-emerald-600 bg-emerald-50" : ""}
           >
-            {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-          </button>
+            {copied ? <><Check className="w-4 h-4 mr-2" /> Copied</> : <><Copy className="w-4 h-4 mr-2" /> Copy Text</>}
+          </Button>
         </div>
         
-        <div className="flex-1 p-8 overflow-y-auto font-serif leading-relaxed whitespace-pre-wrap">
+        <div className="flex-1 p-8 overflow-y-auto bg-white">
           {generatedLetter ? (
-            generatedLetter
+            <div className="prose prose-slate max-w-none prose-p:leading-relaxed whitespace-pre-wrap font-serif text-slate-800">
+              {generatedLetter}
+            </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 italic">
-              <Mail className="w-12 h-12 mb-4 opacity-20" />
+            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+              <div className="w-16 h-16 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center mb-4">
+                 <Mail className="w-6 h-6 opacity-40" />
+              </div>
               <p>Your generated letter will appear here.</p>
             </div>
           )}

@@ -1,8 +1,9 @@
 import React from 'react';
-import { LayoutDashboard, Mic, FileText, TrendingUp, Briefcase, LogOut, Mail, Command } from 'lucide-react';
+import { LayoutDashboard, Mic, FileText, TrendingUp, Briefcase, LogOut, Mail, Command, ChevronRight } from 'lucide-react';
 import { AppView } from '../types';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { Button } from './ui/DesignSystem';
 
 interface SidebarProps {
   currentView: AppView;
@@ -19,20 +20,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
       <button
         onClick={() => setCurrentView(view)}
         className={cn(
-          "group w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 text-sm font-medium relative",
+          "group w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium relative",
           isActive
-            ? "text-white bg-zinc-800/50 shadow-sm"
-            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/30"
+            ? "text-brand-700 bg-brand-50 shadow-sm border border-brand-100"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
         )}
       >
-        <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-blue-400" : "text-zinc-500 group-hover:text-zinc-300")} />
+        <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-brand-600" : "text-slate-400 group-hover:text-slate-600")} />
         {label}
         {isActive && (
-          <motion.div
-            layoutId="sidebar-active"
-            className="absolute left-0 w-1 h-4 bg-blue-500 rounded-r-full"
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          />
+          <ChevronRight className="w-4 h-4 ml-auto text-brand-400" />
         )}
       </button>
     );
@@ -41,55 +38,60 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
   return (
     <motion.aside
       initial={false}
-      animate={{ width: isOpen ? 256 : 0, opacity: isOpen ? 1 : 0 }}
-      className="h-full bg-zinc-950 border-r border-zinc-800/50 flex flex-col z-30 absolute md:relative overflow-hidden"
+      animate={{ width: isOpen ? 280 : 0, opacity: isOpen ? 1 : 0 }}
+      className="h-full bg-white border-r border-slate-200 flex flex-col z-30 absolute md:relative overflow-hidden shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]"
     >
-      <div className="p-6 pb-2">
-        <div className="flex items-center gap-2 mb-6 text-zinc-100">
-          <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 w-8 h-8 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Command className="w-4 h-4 text-white" />
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="bg-brand-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-md shadow-brand-600/20">
+            <Command className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-lg tracking-tight">CareerCraft</span>
+          <div>
+            <span className="font-bold text-lg tracking-tight text-slate-900 block font-display">CareerMint</span>
+            <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">AI Assistant</span>
+          </div>
         </div>
 
-        <nav className="space-y-6">
+        <nav className="space-y-8">
           <div>
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-3">Main</div>
-            <div className="space-y-0.5">
-              <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
-              <NavItem view={AppView.RESUME} icon={FileText} label="Resume" />
-              <NavItem view={AppView.JOBS} icon={Briefcase} label="Jobs" />
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Dashboard</div>
+            <div className="space-y-1">
+              <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Overview" />
+              <NavItem view={AppView.RESUME} icon={FileText} label="Resume Builder" />
+              <NavItem view={AppView.JOBS} icon={Briefcase} label="Job Matches" />
             </div>
           </div>
           
           <div>
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-3">Tools</div>
-            <div className="space-y-0.5">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Career Tools</div>
+            <div className="space-y-1">
               <NavItem view={AppView.COVER_LETTER} icon={Mail} label="Cover Letter" />
-              <NavItem view={AppView.INTERVIEW} icon={Mic} label="Interview" />
-              <NavItem view={AppView.INSIGHTS} icon={TrendingUp} label="Insights" />
+              <NavItem view={AppView.INTERVIEW} icon={Mic} label="Interview Prep" />
+              <NavItem view={AppView.INSIGHTS} icon={TrendingUp} label="Market Data" />
             </div>
           </div>
         </nav>
       </div>
 
-      <div className="mt-auto p-4 border-t border-zinc-800/50 bg-zinc-900/20">
-        <div className="flex items-center gap-3 mb-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 font-medium text-xs">
+      <div className="mt-auto p-4 border-t border-slate-100 bg-slate-50/50">
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <div className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-brand-700 font-bold shadow-sm">
             {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-zinc-200 truncate capitalize">{user.name}</p>
-            <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+            <p className="text-sm font-semibold text-slate-900 truncate capitalize">{user.name}</p>
+            <p className="text-xs text-slate-500 truncate">{user.email}</p>
           </div>
         </div>
-        <button 
+        <Button 
+          variant="outline"
+          size="sm"
           onClick={onLogout}
-          className="w-full flex items-center justify-center gap-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/5 px-3 py-2 rounded-md transition-colors text-xs font-medium border border-transparent hover:border-red-500/10"
+          className="w-full justify-center gap-2 border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50"
         >
           <LogOut className="w-3 h-3" />
           Sign Out
-        </button>
+        </Button>
       </div>
     </motion.aside>
   );
