@@ -19,6 +19,10 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity }) => {
   const [filterType, setFilterType] = useState('All');
   const [isGeneratingJobs, setIsGeneratingJobs] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
+  
+  // Application State
+  const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
+  const [applyingId, setApplyingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (resumeAnalysis && !hasGenerated && jobs.length === 0) {
@@ -69,6 +73,16 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity }) => {
     } finally {
       setAnalyzingId(null);
     }
+  };
+
+  const handleApply = async (job: Job) => {
+    setApplyingId(job.id);
+    // Simulate network delay for application process
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    setAppliedJobs(prev => new Set(prev).add(job.id));
+    setApplyingId(null);
+    onActivity("Job Application", `Applied to ${job.company}`);
   };
 
   if (!resumeAnalysis) {
@@ -179,7 +193,22 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity }) => {
                         {analyzingId === job.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Sparkles className="w-4 h-4 mr-2" /> Analyze Fit</>}
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" className="w-full">Apply Now</Button>
+                    
+                    <Button 
+                      onClick={() => handleApply(job)}
+                      disabled={appliedJobs.has(job.id) || applyingId === job.id}
+                      variant={appliedJobs.has(job.id) ? "secondary" : "outline"} 
+                      size="sm" 
+                      className={cn("w-full transition-all duration-300", appliedJobs.has(job.id) && "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-700")}
+                    >
+                      {appliedJobs.has(job.id) ? (
+                        <><CheckCircle className="w-4 h-4 mr-2" /> Applied</>
+                      ) : applyingId === job.id ? (
+                        <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Applying...</>
+                      ) : (
+                        "Apply Now"
+                      )}
+                    </Button>
                   </div>
                 </div>
               </div>
