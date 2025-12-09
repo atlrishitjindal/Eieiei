@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, TrendingUp, Lightbulb, ChevronDown, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, TrendingUp, Lightbulb, ChevronDown, Download, X } from 'lucide-react';
 import { analyzeResume, generateImprovementExample } from '../services/gemini';
 import { ResumeAnalysis } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -130,9 +130,10 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
           )}
           
           {error && (
-            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-6 flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg border border-red-100 z-20 relative">
-              <AlertCircle className="w-4 h-4" />
-              <span className="text-sm font-medium">{error}</span>
+            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-6 flex items-start gap-3 text-red-600 bg-red-50 px-4 py-3 rounded-lg border border-red-100 z-20 relative max-w-md">
+              <AlertCircle className="w-5 h-5 flex-none mt-0.5" />
+              <div className="flex-1 text-sm font-medium leading-relaxed">{error}</div>
+              <button onClick={(e) => { e.stopPropagation(); setError(null); }} className="text-red-400 hover:text-red-700 p-1"><X className="w-4 h-4" /></button>
             </motion.div>
           )}
         </Card>
