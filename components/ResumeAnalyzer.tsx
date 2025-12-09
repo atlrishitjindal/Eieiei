@@ -23,6 +23,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
   const [examples, setExamples] = useState<Record<number, string>>({});
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
@@ -41,11 +42,21 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
     setError(null);
     try {
       const base64Data = preview.split(',')[1];
-      const analysis = await analyzeResume(base64Data, file.type);
+      
+      // Robust MIME type detection
+      let mimeType = file.type;
+      if (!mimeType) {
+        if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+        else if (file.name.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+        else if (file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
+      }
+
+      const analysis = await analyzeResume(base64Data, mimeType);
       onAnalysisComplete(analysis);
       onActivity("Resume Analysis", `Scored ${analysis.score}/100`);
     } catch (err: any) {
-      setError("Failed to analyze resume. Please try again.");
+      console.error("Resume Analysis Error:", err);
+      setError(err.message || "Failed to analyze resume. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -76,7 +87,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
             <p className="text-slate-500 mt-1">Check your ATS compatibility and get detailed feedback.</p>
          </div>
          {analysisResult && (
-           <Button variant="outline" size="sm" onClick={() => { onAnalysisComplete(null as any); setFile(null); setPreview(null); }}>
+           <Button variant="outline" size="sm" onClick={() => { onAnalysisComplete(null as any); setFile(null); setPreview(null); setError(null); }}>
              Upload New Resume
            </Button>
          )}
@@ -117,7 +128,13 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
                <span>Scanning for ATS keywords...</span>
              </div>
           )}
-          {error && <p className="mt-4 text-red-500 text-sm font-medium bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
+          
+          {error && (
+            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-6 flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg border border-red-100 z-20 relative">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">{error}</span>
+            </motion.div>
+          )}
         </Card>
       )}
 

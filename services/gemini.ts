@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key not found in environment");
+  if (!apiKey) throw new Error("API Key not found in environment. Please ensure it is set.");
   return new GoogleGenAI({ apiKey });
 };
 
@@ -14,6 +14,12 @@ export const analyzeResume = async (
 ): Promise<ResumeAnalysis> => {
   const ai = getAiClient();
   
+  // Normalize MIME type
+  let normalizedMimeType = mimeType;
+  if (mimeType.includes('pdf')) normalizedMimeType = 'application/pdf';
+  else if (mimeType.includes('png')) normalizedMimeType = 'image/png';
+  else if (mimeType.includes('jpg') || mimeType.includes('jpeg')) normalizedMimeType = 'image/jpeg';
+
   const prompt = `Analyze this resume. Identify the candidate's target role.
   Conduct a strict ATS evaluation based on that role.
   
@@ -25,35 +31,43 @@ export const analyzeResume = async (
   5. improvements: 3 specific improvements.
   6. skills: A list of the top 10 extracted technical and soft skills found in the resume.`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: {
-      parts: [
-        { inlineData: { data: data, mimeType: mimeType } },
-        { text: prompt }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          score: { type: Type.NUMBER },
-          summary: { type: Type.STRING },
-          strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-          weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-          improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
-          skills: { type: Type.ARRAY, items: { type: Type.STRING } },
-        },
-        required: ["score", "summary", "strengths", "weaknesses", "improvements", "skills"]
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          { inlineData: { data: data, mimeType: normalizedMimeType } },
+          { text: prompt }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            summary: { type: Type.STRING },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["score", "summary", "strengths", "weaknesses", "improvements", "skills"]
+        }
       }
-    }
-  });
+    });
 
-  const text = response.text;
-  if (!text) throw new Error("No response from model");
-  
-  return JSON.parse(text) as ResumeAnalysis;
+    const text = response.text;
+    if (!text) throw new Error("No response received from AI model.");
+    
+    return JSON.parse(text) as ResumeAnalysis;
+  } catch (error: any) {
+    console.error("Gemini Analyze Error:", error);
+    if (error.message?.includes('400')) {
+       throw new Error("Invalid file format or corrupted file. Please try a standard PDF or Image.");
+    }
+    throw error;
+  }
 };
 
 export const generateImprovementExample = async (improvement: string, resumeSummary: string): Promise<string> => {
