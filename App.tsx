@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import LiveInterview from './components/LiveInterview';
 import ResumeAnalyzer from './components/ResumeAnalyzer';
@@ -12,8 +12,10 @@ import Applicants from './components/Applicants';
 import CoverLetter from './components/CoverLetter';
 import SkillSuggestions from './components/SkillSuggestions';
 import MyApplications from './components/MyApplications';
+import CalendarView from './components/CalendarView';
 import { AppView, ResumeAnalysis, ActivityLog, UserRole, Job, Application } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from './lib/supabaseClient';
 
 function App() {
   const [user, setUser] = useState<{name: string, email: string, role: UserRole} | null>(null);
@@ -29,6 +31,37 @@ function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
 
+  // Initialize Auth Listener
+  useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || '',
+            role: (session.user.user_metadata.role as UserRole) || 'candidate'
+        });
+        setViewState('app');
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || '',
+            role: (session.user.user_metadata.role as UserRole) || 'candidate'
+        });
+        setViewState('app');
+      } else if (_event === 'SIGNED_OUT') {
+        setUser(null);
+        setViewState('landing');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Handlers
   const handleLogin = (u: {name: string, email: string, role: UserRole}) => {
     setUser(u);
@@ -41,15 +74,13 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setViewState('landing');
     setCurrentView(AppView.DASHBOARD);
     setResumeAnalysis(null);
     setActivities([]);
-    // Note: We might want to persist jobs/applications in a real app, 
-    // but here we clear them or keep them based on preference. 
-    // For this session, we'll keep them so you can relogin as employer and see data.
   };
 
   const addActivity = (title: string, meta: string) => {
@@ -76,9 +107,10 @@ function App() {
       jobTitle: job.title,
       candidateName: user.name,
       candidateEmail: user.email,
-      matchScore: Math.floor(Math.random() * (98 - 70 + 1) + 70), // Mock score if not analyzed
+      matchScore: resumeAnalysis ? resumeAnalysis.score : Math.floor(Math.random() * (98 - 70 + 1) + 70), // Mock score if not analyzed
       status: 'New',
-      timestamp: new Date()
+      timestamp: new Date(),
+      resumeFile: resumeAnalysis?.file
     };
 
     setApplications(prev => [newApplication, ...prev]);
@@ -97,10 +129,12 @@ function App() {
           
           if (newStatus === 'Interview' && interviewDate) {
              updates.interviewDate = interviewDate;
-             // Auto-generate a WORKING meeting link (Jitsi) if not present
+             // Auto-generate Google Meet link if not present
              if (!app.meetingLink) {
-                const roomName = `CareerMint-Interview-${Math.random().toString(36).substr(2, 6)}-${Date.now().toString().slice(-4)}`;
-                updates.meetingLink = `https://meet.jit.si/${roomName}`;
+                // Generate Google Meet style link (abc-defg-hij)
+                const chars = 'abcdefghijklmnopqrstuvwxyz';
+                const segment = (len: number) => Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+                updates.meetingLink = `https://meet.google.com/${segment(3)}-${segment(4)}-${segment(3)}`;
              }
           }
           return { ...app, ...updates };
@@ -145,6 +179,7 @@ function App() {
         isOpen={isSidebarOpen}
         user={user!}
         onLogout={handleLogout}
+        applications={applications}
       />
 
       <main className="flex-1 flex flex-col min-w-0 h-full relative">
@@ -154,7 +189,7 @@ function App() {
              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
                {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
              </button>
-             <span className="font-bold text-slate-900 tracking-tight">CareerMint</span>
+             <span className="font-bold text-slate-900 tracking-tight">CarrerX</span>
           </div>
         </div>
 
@@ -250,6 +285,13 @@ function App() {
                 <SkillSuggestions 
                   resumeAnalysis={resumeAnalysis} 
                   onActivity={addActivity}
+                />
+              )}
+
+              {currentView === AppView.CALENDAR && (
+                <CalendarView 
+                  applications={applications}
+                  user={user!}
                 />
               )}
             </motion.div>

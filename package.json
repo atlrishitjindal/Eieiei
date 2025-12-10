@@ -1,5 +1,5 @@
 {
-  "name": "copy-of-careercraft-ai",
+  "name": "carrerx",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,7 +17,8 @@
     "uuid": "^13.0.0",
     "framer-motion": "^11.0.25",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1"
+    "tailwind-merge": "^2.2.1",
+    "@supabase/supabase-js": "^2.48.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

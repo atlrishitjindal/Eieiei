@@ -395,17 +395,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setCurrentView, resumeAnaly
               )}
              </Card>
           </section>
-
-          <Card className="bg-white border-2 border-brand-100 p-6 relative overflow-hidden group hover:border-brand-200 transition-colors">
-             <div className="relative z-10 text-center">
-               <div className="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                  <Crown className="w-6 h-6 text-brand-600" />
-               </div>
-               <h4 className="font-bold text-lg text-slate-900 mb-2">Upgrade to Pro</h4>
-               <p className="text-slate-500 text-sm mb-4">Unlock unlimited resume scans and mock interviews.</p>
-               <Button size="sm" variant="primary" className="w-full">View Plans</Button>
-             </div>
-          </Card>
         </motion.div>
       </div>
     </motion.div>

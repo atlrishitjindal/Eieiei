@@ -64,15 +64,21 @@ export const analyzeResume = async (
   else if (mimeType.includes('png')) normalizedMimeType = 'image/png';
   else if (mimeType.includes('jpg') || mimeType.includes('jpeg')) normalizedMimeType = 'image/jpeg';
 
-  const prompt = `Analyze this resume. Identify the candidate's target role.
-  Conduct a strict ATS evaluation based on that role.
+  const prompt = `Analyze this resume acting as a helpful and encouraging Applicant Tracking System (ATS) consultant. 
+  Identify the candidate's target role based on experience.
+  
+  SCORING RULES:
+  - Be fair and constructive. A good, standard resume should score between 70-85.
+  - Excellent resumes with quantifiable results should score above 85.
+  - Only give low scores (<60) if the resume is very sparse, has major formatting errors, or lacks relevant skills entirely.
+  - Look for transferrable skills and potential, not just perfect keyword matching.
   
   Provide JSON:
   1. score: 0-100 ATS score.
-  2. summary: Executive summary.
-  3. strengths: 3 strong points.
-  4. weaknesses: 3 gaps/weaknesses.
-  5. improvements: 3 specific improvements.
+  2. summary: A professional summary of the candidate's profile.
+  3. strengths: 3 strong points or good qualities found in the resume.
+  4. weaknesses: 3 areas that could use improvement (be constructive).
+  5. improvements: 3 actionable, specific suggestions to reach a higher score.
   6. skills: A list of the top 10 extracted technical and soft skills found in the resume.`;
 
   try {
@@ -186,15 +192,18 @@ export const getMarketInsights = async (query: string): Promise<InsightResult> =
 
 export const generateTailoredJobs = async (resumeSummary: string, skills: string[]): Promise<Job[]> => {
   const ai = getAiClient();
-  const prompt = `Generate 12 realistic job postings that are highly relevant to this candidate profile.
+  const count = Math.floor(Math.random() * (12 - 5 + 1) + 5); // Random between 5 and 12
+
+  const prompt = `Generate ${count} realistic job postings that are highly relevant to this candidate profile.
   Candidate Summary: ${resumeSummary}
   Candidate Skills: ${skills.join(', ')}
 
   Task:
   1. Infer the candidate's industry and seniority level.
-  2. Create 12 diverse job opportunities (mix of big tech, startups, agencies, etc. if applicable).
+  2. Create ${count} diverse job opportunities (mix of big tech, startups, agencies, etc. if applicable).
   3. Ensure the job titles and requirements are realistic for the candidate's level.
   4. Include a mix of "Best Match" (perfect fit) and "Stretch" (slightly higher level) roles.
+  5. Descriptions should be concise (1 sentence).
 
   Return a JSON array where each object has:
   - id: A unique string
@@ -203,8 +212,8 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
   - location: Location (e.g. "Remote", "New York, NY", etc.)
   - salary: Salary range (e.g. "$120k - $150k")
   - type: "Full-time" | "Contract" | "Hybrid" | "Remote"
-  - description: Brief job description (2 sentences)
-  - requirements: Array of 4-6 skills (mix of candidate skills and others)
+  - description: Brief job description (1 sentence)
+  - requirements: Array of 3-4 skills
   - postedAt: e.g. "2 days ago"`;
 
   try {
@@ -330,7 +339,7 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
   - reason: Why this skill is valuable for this specific profile (1 sentence).
   - difficulty: "Beginner", "Intermediate", or "Advanced" based on learning curve relative to their current skills.
   - category: "Technical", "Soft Skill", or "Tool"
-  - searchQuery: A highly optimized Google search query string to find the BEST FREE OR PAID COURSE for this skill (e.g. "Docker complete course for beginners" or "Advanced React patterns course").
+  - searchQuery: A highly optimized Google search query string to find the BEST COURSE for this skill (e.g. "Docker complete course for beginners" or "Advanced React patterns course").
   `;
 
   try {

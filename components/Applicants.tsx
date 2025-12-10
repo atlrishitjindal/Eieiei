@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Mail, CheckCircle, XCircle, Clock, Search, Filter, MoreHorizontal, FileText, Eye, Download, Calendar, X, ThumbsUp, ThumbsDown, Bookmark, ArrowRight, ExternalLink } from 'lucide-react';
+import { Users, Mail, CheckCircle, XCircle, Search, Filter, FileText, Download, Calendar, X, ThumbsDown, Bookmark, ExternalLink, Eye, ThumbsUp } from 'lucide-react';
 import { Application, Job } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, Badge, Input } from './ui/DesignSystem';
@@ -44,6 +44,11 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
   });
 
   const handleStatusChange = (id: string, status: Application['status']) => {
+    // Always hide scheduler when switching to a non-interview status to prevent UI confusion
+    if (status !== 'Interview') {
+        setShowScheduleInput(false);
+    }
+
     if (status === 'Interview') {
        // Don't update immediately if it's interview, show scheduler first
        setShowScheduleInput(true);
@@ -73,6 +78,57 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
   const openModal = (app: Application) => {
      setSelectedApp(app);
      setShowScheduleInput(false); // Reset schedule state on new open
+  };
+
+  const handleDownloadResume = () => {
+    if (!selectedApp) return;
+
+    if (selectedApp.resumeFile) {
+        const link = document.createElement("a");
+        link.href = `data:${selectedApp.resumeFile.type};base64,${selectedApp.resumeFile.data}`;
+        link.download = selectedApp.resumeFile.name;
+        document.body.appendChild(link); 
+        link.click();
+        document.body.removeChild(link);
+    } else {
+        // Fallback for mock applications that don't have a real file
+        const element = document.createElement("a");
+        const content = `Resume for ${selectedApp.candidateName}\n\nRole: ${selectedApp.jobTitle}\nEmail: ${selectedApp.candidateEmail}\n\n[This is a mock resume file generated because no real file was uploaded for this demo application.]`;
+        const file = new Blob([content], {type: 'text/plain'});
+        element.href = URL.createObjectURL(file);
+        element.download = `${selectedApp.candidateName.replace(/\s+/g, '_')}_MockResume.txt`;
+        document.body.appendChild(element); 
+        element.click();
+        document.body.removeChild(element);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (filteredApplications.length === 0) return;
+
+    const headers = ["Candidate Name", "Email", "Job Title", "Applied Date", "Match Score", "Status"];
+    const rows = filteredApplications.map(app => [
+      `"${app.candidateName.replace(/"/g, '""')}"`,
+      `"${app.candidateEmail.replace(/"/g, '""')}"`,
+      `"${app.jobTitle.replace(/"/g, '""')}"`,
+      `"${new Date(app.timestamp).toLocaleDateString()}"`,
+      app.matchScore,
+      `"${app.status}"`
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(e => e.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `applicants_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -242,12 +298,37 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
                              {selectedApp.meetingLink && (
                                 <div className="pl-8">
                                    <a href={selectedApp.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 font-medium hover:underline flex items-center gap-1 bg-emerald-100/50 px-2 py-1 rounded w-fit">
-                                     Join Meeting <ExternalLink className="w-3 h-3" />
+                                     Join Google Meet <ExternalLink className="w-3 h-3" />
                                    </a>
                                 </div>
                              )}
                           </div>
                        )}
+                    </div>
+
+                    <div className="space-y-3">
+                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Documents</h4>
+                       <button 
+                          onClick={handleDownloadResume}
+                          className="w-full flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg hover:border-purple-300 hover:shadow-sm transition-all group text-left"
+                       >
+                          <div className="flex items-center gap-3">
+                             <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 flex items-center justify-center text-red-500">
+                                <FileText className="w-4 h-4" />
+                             </div>
+                             <div>
+                                <p className="text-sm font-semibold text-slate-900 group-hover:text-purple-700">
+                                    {selectedApp.resumeFile ? selectedApp.resumeFile.name : "Resume.pdf"}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    {selectedApp.resumeFile 
+                                        ? `${selectedApp.resumeFile.type.split('/')[1]?.toUpperCase() || 'FILE'} • ${(selectedApp.resumeFile.size / 1024 / 1024).toFixed(2)} MB` 
+                                        : "PDF • 1.2 MB"}
+                                </p>
+                             </div>
+                          </div>
+                          <Download className="w-4 h-4 text-slate-400 group-hover:text-purple-600" />
+                       </button>
                     </div>
 
                     <div className="space-y-3">
@@ -271,15 +352,10 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
                  
                  <div className="p-4 border-t border-slate-200 bg-slate-50">
                     <Button 
-                        onClick={() => handleStatusChange(selectedApp.id, 'Shortlisted')} 
-                        className="w-full bg-purple-600 hover:bg-purple-700"
-                        disabled={selectedApp.status === 'Shortlisted'}
+                        onClick={() => setSelectedApp(null)} 
+                        className="w-full bg-slate-900 hover:bg-slate-800 transition-colors"
                     >
-                       {selectedApp.status === 'Shortlisted' ? (
-                          <><CheckCircle className="w-4 h-4 mr-2" /> Shortlisted</>
-                       ) : (
-                          <><Bookmark className="w-4 h-4 mr-2" /> Shortlist Candidate</>
-                       )}
+                       <CheckCircle className="w-4 h-4 mr-2" /> Done
                     </Button>
                  </div>
               </div>
@@ -303,7 +379,7 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
            <Button variant="outline" className="gap-2">
              <Filter className="w-4 h-4" /> Filter
            </Button>
-           <Button variant="primary" className="bg-purple-600 hover:bg-purple-700">
+           <Button onClick={handleExportCSV} variant="primary" className="bg-purple-600 hover:bg-purple-700">
              Export CSV
            </Button>
         </div>
@@ -325,7 +401,7 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
           {/* Hide filters if we are in Shortlisted-only mode to prevent confusion */}
           {!showShortlistedOnly && (
             <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
-               {['All', 'New', 'Reviewed', 'Shortlisted', 'Interview', 'Rejected'].map(status => (
+               {['All', 'New', 'Reviewed', 'Interview', 'Rejected'].map(status => (
                  <button
                    key={status}
                    onClick={() => setStatusFilter(status)}

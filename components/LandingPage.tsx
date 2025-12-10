@@ -18,7 +18,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
             <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-600/20">
               <span className="font-bold text-white text-xl font-display">C</span>
             </div>
-            <span className="font-bold text-xl tracking-tight text-slate-900 font-display">CareerMint</span>
+            <span className="font-bold text-xl tracking-tight text-slate-900 font-display">CarrerX</span>
           </div>
           
           <div className="flex items-center gap-6">
@@ -152,7 +152,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-20">
              <Badge variant="neutral" className="mb-4">Process</Badge>
-             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 font-display">How CareerMint works</h2>
+             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 font-display">How CarrerX works</h2>
              <p className="text-lg text-slate-500">Three simple steps to transform your job search from stressful to successful.</p>
           </div>
 
@@ -283,7 +283,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
           <div className="grid md:grid-cols-3 gap-8">
              {[
                {
-                 quote: "I applied to 50 jobs with no response. After using CareerMint, I got 3 interviews in a week.",
+                 quote: "I applied to 50 jobs with no response. After using CarrerX, I got 3 interviews in a week.",
                  author: "Sarah J.",
                  role: "Marketing Manager",
                  company: "Spotify"
@@ -326,9 +326,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
                   Join thousands of professionals who are landing better jobs, faster.
                </p>
                <Button onClick={onGetStarted} size="xl" variant="primary" className="relative z-10 shadow-xl shadow-brand-600/20">
-                  Start For Free <ArrowRight className="w-5 h-5 ml-2" />
+                  Get Started Now <ArrowRight className="w-5 h-5 ml-2" />
                </Button>
-               <p className="mt-6 text-slate-400 text-sm font-medium relative z-10">No credit card required · Cancel anytime</p>
+               <p className="mt-6 text-slate-400 text-sm font-medium relative z-10">No credit card required</p>
             </div>
          </div>
       </div>
@@ -342,7 +342,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
                     <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
                        <span className="font-bold text-white text-lg font-display">C</span>
                     </div>
-                    <span className="font-bold text-xl text-slate-900 font-display">CareerMint</span>
+                    <span className="font-bold text-xl text-slate-900 font-display">CarrerX</span>
                  </div>
                  <p className="text-slate-500 max-w-xs leading-relaxed">
                     Empowering job seekers with AI-driven tools to land their dream roles.
@@ -354,7 +354,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
                     <li><a href="#" className="hover:text-brand-600">Resume Builder</a></li>
                     <li><a href="#" className="hover:text-brand-600">Interview Prep</a></li>
                     <li><a href="#" className="hover:text-brand-600">Job Match</a></li>
-                    <li><a href="#" className="hover:text-brand-600">Pricing</a></li>
+                    <li><a href="#" className="hover:text-brand-600">Skill Suggestion</a></li>
                  </ul>
               </div>
               <div>
@@ -368,7 +368,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
               </div>
            </div>
            <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
-              <p className="text-slate-400 text-sm">© 2025 CareerMint AI. All rights reserved.</p>
+              <p className="text-slate-400 text-sm">© 2025 CarrerX AI. All rights reserved.</p>
               <div className="flex gap-6 text-sm text-slate-500">
                  <a href="#" className="hover:text-brand-600">Privacy Policy</a>
                  <a href="#" className="hover:text-brand-600">Terms of Service</a>

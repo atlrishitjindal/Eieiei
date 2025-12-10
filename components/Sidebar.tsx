@@ -1,6 +1,6 @@
-import React from 'react';
-import { LayoutDashboard, Mic, FileText, TrendingUp, Briefcase, LogOut, Mail, Command, ChevronRight, GraduationCap, Users, UserCheck, Settings, Bookmark, FolderOpen } from 'lucide-react';
-import { AppView, UserRole } from '../types';
+import React, { useState } from 'react';
+import { LayoutDashboard, Mic, FileText, TrendingUp, Briefcase, LogOut, Mail, Command, ChevronRight, GraduationCap, Users, UserCheck, Settings, Bookmark, FolderOpen, Calendar } from 'lucide-react';
+import { AppView, UserRole, Application } from '../types';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { Button } from './ui/DesignSystem';
@@ -11,9 +11,10 @@ interface SidebarProps {
   isOpen: boolean;
   user: { name: string; email: string; role?: UserRole };
   onLogout: () => void;
+  applications?: Application[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, user, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, user, onLogout, applications = [] }) => {
   const isEmployer = user.role === 'employer';
 
   const NavItem = ({ view, icon: Icon, label }: { view: AppView; icon: any; label: string }) => {
@@ -50,13 +51,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
       animate={{ width: isOpen ? 280 : 0, opacity: isOpen ? 1 : 0 }}
       className="h-full bg-white border-r border-slate-200 flex flex-col z-30 absolute md:relative overflow-hidden shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]"
     >
-      <div className="p-6">
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
         <div className="flex items-center gap-3 mb-8">
           <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-md", isEmployer ? "bg-purple-600 shadow-purple-600/20" : "bg-brand-600 shadow-brand-600/20")}>
             <Command className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-bold text-lg tracking-tight text-slate-900 block font-display">CareerMint</span>
+            <span className="font-bold text-lg tracking-tight text-slate-900 block font-display">CarrerX</span>
             <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
               {isEmployer ? "Recruiter OS" : "AI Assistant"}
             </span>
@@ -74,6 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
                   <NavItem view={AppView.JOBS} icon={Briefcase} label="Posted Jobs" />
                   <NavItem view={AppView.APPLICANTS} icon={Users} label="Applicants" />
                   <NavItem view={AppView.SHORTLISTED} icon={Bookmark} label="Shortlisted" />
+                  <NavItem view={AppView.CALENDAR} icon={Calendar} label="Calendar" />
                 </div>
               </div>
             </>
@@ -85,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
                 <div className="space-y-1">
                   <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Overview" />
                   <NavItem view={AppView.MY_APPLICATIONS} icon={FolderOpen} label="My Applications" />
-                  <NavItem view={AppView.RESUME} icon={FileText} label="Resume Builder" />
+                  <NavItem view={AppView.RESUME} icon={FileText} label="Resume Analyzer" />
                   <NavItem view={AppView.JOBS} icon={Briefcase} label="Job Matches" />
                 </div>
               </div>
@@ -97,6 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
                   <NavItem view={AppView.COVER_LETTER} icon={Mail} label="Cover Letter" />
                   <NavItem view={AppView.INTERVIEW} icon={Mic} label="Interview Prep" />
                   <NavItem view={AppView.INSIGHTS} icon={TrendingUp} label="Market Data" />
+                  <NavItem view={AppView.CALENDAR} icon={Calendar} label="Calendar" />
                 </div>
               </div>
             </>

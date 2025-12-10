@@ -10,7 +10,8 @@ export enum AppView {
   EMPLOYER_DASHBOARD = 'EMPLOYER_DASHBOARD',
   APPLICANTS = 'APPLICANTS',
   SHORTLISTED = 'SHORTLISTED',
-  MY_APPLICATIONS = 'MY_APPLICATIONS'
+  MY_APPLICATIONS = 'MY_APPLICATIONS',
+  CALENDAR = 'CALENDAR'
 }
 
 export type UserRole = 'candidate' | 'employer';
@@ -22,6 +23,13 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface ResumeFile {
+  name: string;
+  type: string;
+  size: number;
+  data: string; // Base64 string
+}
+
 export interface ResumeAnalysis {
   score: number;
   summary: string;
@@ -29,6 +37,7 @@ export interface ResumeAnalysis {
   weaknesses: string[];
   improvements: string[];
   skills: string[]; // Added for skills gap analysis
+  file?: ResumeFile;
 }
 
 export interface InterviewReport {
@@ -42,6 +51,7 @@ export interface InterviewReport {
 export interface GroundingSource {
   uri: string;
   title: string;
+  url?: string; // Add url as an optional property if needed, though GroundingSource uses uri
 }
 
 export interface InsightResult {
@@ -72,6 +82,7 @@ export interface Application {
   timestamp: Date;
   interviewDate?: Date;
   meetingLink?: string;
+  resumeFile?: ResumeFile;
 }
 
 export interface JobMatchResult {

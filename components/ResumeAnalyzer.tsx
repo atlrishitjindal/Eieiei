@@ -45,7 +45,18 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
     try {
       const base64Data = preview.split(',')[1];
       const analysis = await analyzeResume(base64Data, file.type);
-      onAnalysisComplete(analysis);
+      
+      const fullAnalysis: ResumeAnalysis = {
+        ...analysis,
+        file: {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data: base64Data
+        }
+      };
+
+      onAnalysisComplete(fullAnalysis);
       onActivity("Resume Analysis", `Scored ${analysis.score}/100`);
     } catch (err: any) {
       console.error(err);
