@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { ArrowRight, Github, Chrome, Command } from 'lucide-react';
+import { ArrowRight, Github, Chrome, Command, Briefcase, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Input, Card } from './ui/DesignSystem';
+import { UserRole } from '../types';
 
 interface AuthProps {
-  onComplete: (user: { name: string; email: string }) => void;
+  onComplete: (user: { name: string; email: string; role: UserRole }) => void;
   initialMode?: 'login' | 'signup';
 }
 
 const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
+  const [role, setRole] = useState<UserRole>('candidate');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,8 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
       setLoading(false);
       onComplete({
         name: email.split('@')[0],
-        email: email
+        email: email,
+        role: role
       });
     }, 1500);
   };
@@ -41,20 +44,44 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
             {mode === 'login' ? 'Welcome back' : 'Create your account'}
           </h2>
           <p className="text-slate-500 mt-2 text-sm">
-            {mode === 'login' ? 'Enter your details to access your workspace.' : 'Start your career optimization journey today.'}
+            {mode === 'login' ? 'Enter your details to access your workspace.' : 'Start your journey today.'}
           </p>
         </div>
 
         <Card className="shadow-xl shadow-slate-200/50 p-8 border-slate-200">
+          {/* Role Toggle */}
+          <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
+            <button
+              type="button"
+              onClick={() => setRole('candidate')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-all ${
+                role === 'candidate' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <User className="w-4 h-4" /> Candidate
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('employer')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-all ${
+                role === 'employer' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Briefcase className="w-4 h-4" /> Employer
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Email Address</label>
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                {role === 'employer' ? 'Work Email' : 'Email Address'}
+              </label>
               <Input 
                 type="email" 
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder={role === 'employer' ? "recruiter@company.com" : "name@example.com"}
                 className="bg-slate-50 border-slate-300"
               />
             </div>
@@ -72,8 +99,8 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
 
             <Button 
               type="submit"
-              variant="primary"
-              className="w-full"
+              variant={role === 'employer' ? 'primary' : 'primary'} // Could change color based on role if desired
+              className={`w-full ${role === 'employer' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20' : ''}`}
               isLoading={loading}
             >
               {mode === 'login' ? 'Sign In' : 'Create Account'} <ArrowRight className="w-4 h-4 ml-2" />
@@ -105,7 +132,7 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
           {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
           <button 
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="text-brand-600 font-bold hover:underline"
+            className={`font-bold hover:underline ${role === 'employer' ? 'text-purple-600' : 'text-brand-600'}`}
           >
             {mode === 'login' ? 'Sign up' : 'Log in'}
           </button>

@@ -1,6 +1,6 @@
 import React from 'react';
-import { LayoutDashboard, Mic, FileText, TrendingUp, Briefcase, LogOut, Mail, Command, ChevronRight } from 'lucide-react';
-import { AppView } from '../types';
+import { LayoutDashboard, Mic, FileText, TrendingUp, Briefcase, LogOut, Mail, Command, ChevronRight, GraduationCap, Users, UserCheck, Settings, Bookmark, FolderOpen } from 'lucide-react';
+import { AppView, UserRole } from '../types';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { Button } from './ui/DesignSystem';
@@ -9,27 +9,36 @@ interface SidebarProps {
   currentView: AppView;
   setCurrentView: (view: AppView) => void;
   isOpen: boolean;
-  user: { name: string; email: string };
+  user: { name: string; email: string; role?: UserRole };
   onLogout: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, user, onLogout }) => {
+  const isEmployer = user.role === 'employer';
+
   const NavItem = ({ view, icon: Icon, label }: { view: AppView; icon: any; label: string }) => {
     const isActive = currentView === view;
+    // Helper to determine active color based on role
+    const activeClass = isEmployer 
+      ? "text-purple-700 bg-purple-50 shadow-sm border border-purple-100" 
+      : "text-brand-700 bg-brand-50 shadow-sm border border-brand-100";
+    
+    const iconClass = isActive 
+      ? (isEmployer ? "text-purple-600" : "text-brand-600")
+      : "text-slate-400 group-hover:text-slate-600";
+
     return (
       <button
         onClick={() => setCurrentView(view)}
         className={cn(
           "group w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium relative",
-          isActive
-            ? "text-brand-700 bg-brand-50 shadow-sm border border-brand-100"
-            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          isActive ? activeClass : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
         )}
       >
-        <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-brand-600" : "text-slate-400 group-hover:text-slate-600")} />
+        <Icon className={cn("w-4 h-4 transition-colors", iconClass)} />
         {label}
         {isActive && (
-          <ChevronRight className="w-4 h-4 ml-auto text-brand-400" />
+          <ChevronRight className={cn("w-4 h-4 ml-auto", isEmployer ? "text-purple-400" : "text-brand-400")} />
         )}
       </button>
     );
@@ -43,39 +52,61 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
     >
       <div className="p-6">
         <div className="flex items-center gap-3 mb-8">
-          <div className="bg-brand-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-md shadow-brand-600/20">
+          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-md", isEmployer ? "bg-purple-600 shadow-purple-600/20" : "bg-brand-600 shadow-brand-600/20")}>
             <Command className="w-5 h-5 text-white" />
           </div>
           <div>
             <span className="font-bold text-lg tracking-tight text-slate-900 block font-display">CareerMint</span>
-            <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">AI Assistant</span>
+            <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
+              {isEmployer ? "Recruiter OS" : "AI Assistant"}
+            </span>
           </div>
         </div>
 
         <nav className="space-y-8">
-          <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Dashboard</div>
-            <div className="space-y-1">
-              <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Overview" />
-              <NavItem view={AppView.RESUME} icon={FileText} label="Resume Builder" />
-              <NavItem view={AppView.JOBS} icon={Briefcase} label="Job Matches" />
-            </div>
-          </div>
-          
-          <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Career Tools</div>
-            <div className="space-y-1">
-              <NavItem view={AppView.COVER_LETTER} icon={Mail} label="Cover Letter" />
-              <NavItem view={AppView.INTERVIEW} icon={Mic} label="Interview Prep" />
-              <NavItem view={AppView.INSIGHTS} icon={TrendingUp} label="Market Data" />
-            </div>
-          </div>
+          {isEmployer ? (
+            // EMPLOYER NAVIGATION
+            <>
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Recruitment</div>
+                <div className="space-y-1">
+                  <NavItem view={AppView.EMPLOYER_DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
+                  <NavItem view={AppView.JOBS} icon={Briefcase} label="Posted Jobs" />
+                  <NavItem view={AppView.APPLICANTS} icon={Users} label="Applicants" />
+                  <NavItem view={AppView.SHORTLISTED} icon={Bookmark} label="Shortlisted" />
+                </div>
+              </div>
+            </>
+          ) : (
+            // CANDIDATE NAVIGATION
+            <>
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Dashboard</div>
+                <div className="space-y-1">
+                  <NavItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Overview" />
+                  <NavItem view={AppView.MY_APPLICATIONS} icon={FolderOpen} label="My Applications" />
+                  <NavItem view={AppView.RESUME} icon={FileText} label="Resume Builder" />
+                  <NavItem view={AppView.JOBS} icon={Briefcase} label="Job Matches" />
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Career Tools</div>
+                <div className="space-y-1">
+                  <NavItem view={AppView.SKILLS} icon={GraduationCap} label="Skill Suggestions" />
+                  <NavItem view={AppView.COVER_LETTER} icon={Mail} label="Cover Letter" />
+                  <NavItem view={AppView.INTERVIEW} icon={Mic} label="Interview Prep" />
+                  <NavItem view={AppView.INSIGHTS} icon={TrendingUp} label="Market Data" />
+                </div>
+              </div>
+            </>
+          )}
         </nav>
       </div>
 
       <div className="mt-auto p-4 border-t border-slate-100 bg-slate-50/50">
         <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-brand-700 font-bold shadow-sm">
+          <div className={cn("w-9 h-9 rounded-full border flex items-center justify-center font-bold shadow-sm", isEmployer ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-slate-200 text-brand-700")}>
             {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">

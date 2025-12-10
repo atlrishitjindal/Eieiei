@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Award, Zap, TrendingUp, Lightbulb, ChevronRight } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Award, Zap, TrendingUp, Lightbulb, ChevronRight, Hash } from 'lucide-react';
 import { analyzeResume, generateImprovementExample } from '../services/gemini';
 import { ResumeAnalysis } from '../types';
 
@@ -76,7 +76,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold text-white">AI Resume Optimizer</h2>
         <p className="text-slate-400 max-w-2xl mx-auto">
@@ -85,7 +85,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
       </div>
 
       {!analysisResult && (
-        <div className="bg-slate-900 rounded-2xl shadow-sm border-2 border-dashed border-slate-700 p-12 text-center transition-all hover:border-blue-500 hover:bg-slate-900/80 group">
+        <div className="bg-slate-900 rounded-2xl shadow-sm border-2 border-dashed border-slate-700 p-12 text-center transition-all hover:border-blue-500 hover:bg-slate-900/80 group max-w-3xl mx-auto">
           <input
             type="file"
             id="resume-upload"
@@ -175,7 +175,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {/* Strengths */}
             <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-6">
               <div className="flex items-center gap-2 mb-4 text-green-400">
@@ -248,6 +248,29 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({ analysisResult, onAnaly
                 ))}
               </ul>
             </div>
+
+            {/* Detected Skills - NEW SECTION */}
+            <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-6">
+              <div className="flex items-center gap-2 mb-4 text-purple-400">
+                <Hash className="w-6 h-6" />
+                <h3 className="font-bold text-lg text-white">Detected Skills</h3>
+              </div>
+              <div className="space-y-4">
+                <p className="text-slate-400 text-xs">These skills were extracted from your resume and are used to personalize job matches and recommendations.</p>
+                <div className="flex flex-wrap gap-2">
+                  {analysisResult.skills && analysisResult.skills.length > 0 ? (
+                    analysisResult.skills.map((skill, i) => (
+                      <span key={i} className="bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-700 hover:border-purple-500 hover:text-white transition-colors cursor-default">
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-slate-500 text-sm italic">No specific technical skills detected in this pass.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

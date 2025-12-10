@@ -8,12 +8,15 @@ import Auth from './components/Auth';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Jobs from './components/Jobs';
+import Applicants from './components/Applicants';
 import CoverLetter from './components/CoverLetter';
-import { AppView, ResumeAnalysis, ActivityLog } from './types';
+import SkillSuggestions from './components/SkillSuggestions';
+import MyApplications from './components/MyApplications';
+import { AppView, ResumeAnalysis, ActivityLog, UserRole, Job, Application } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
-  const [user, setUser] = useState<{name: string, email: string} | null>(null);
+  const [user, setUser] = useState<{name: string, email: string, role: UserRole} | null>(null);
   const [viewState, setViewState] = useState<'landing' | 'auth_login' | 'auth_signup' | 'app'>('landing');
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -21,11 +24,21 @@ function App() {
   // Global State for Shared Data
   const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysis | null>(null);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  
+  // Shared Job/Recruitment State
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
 
   // Handlers
-  const handleLogin = (u: {name: string, email: string}) => {
+  const handleLogin = (u: {name: string, email: string, role: UserRole}) => {
     setUser(u);
     setViewState('app');
+    // Set default view based on role
+    if (u.role === 'employer') {
+        setCurrentView(AppView.EMPLOYER_DASHBOARD);
+    } else {
+        setCurrentView(AppView.DASHBOARD);
+    }
   };
 
   const handleLogout = () => {
@@ -34,6 +47,9 @@ function App() {
     setCurrentView(AppView.DASHBOARD);
     setResumeAnalysis(null);
     setActivities([]);
+    // Note: We might want to persist jobs/applications in a real app, 
+    // but here we clear them or keep them based on preference. 
+    // For this session, we'll keep them so you can relogin as employer and see data.
   };
 
   const addActivity = (title: string, meta: string) => {
@@ -41,12 +57,65 @@ function App() {
       id: Date.now().toString(),
       type: title.toLowerCase().includes('resume') ? 'resume' : 
             title.toLowerCase().includes('interview') ? 'interview' : 
-            title.toLowerCase().includes('job') ? 'job_match' : 'cover_letter',
+            title.toLowerCase().includes('job') ? 'job_match' : 
+            title.toLowerCase().includes('skill') ? 'skills' : 'cover_letter',
       title,
       meta,
       timestamp: new Date()
     };
     setActivities(prev => [newActivity, ...prev].slice(0, 20));
+  };
+
+  const handleApplyToJob = (job: Job) => {
+    if (!user) return;
+
+    // Create a new application
+    const newApplication: Application = {
+      id: Date.now().toString(),
+      jobId: job.id,
+      jobTitle: job.title,
+      candidateName: user.name,
+      candidateEmail: user.email,
+      matchScore: Math.floor(Math.random() * (98 - 70 + 1) + 70), // Mock score if not analyzed
+      status: 'New',
+      timestamp: new Date()
+    };
+
+    setApplications(prev => [newApplication, ...prev]);
+    addActivity("Job Application", `Applied to ${job.company}`);
+  };
+
+  const handlePostJob = (job: Job) => {
+    setJobs(prev => [job, ...prev]);
+    addActivity("Job Posted", job.title);
+  };
+
+  const handleUpdateApplicationStatus = (id: string, newStatus: Application['status'], interviewDate?: Date) => {
+    setApplications(prev => prev.map(app => {
+      if (app.id === id) {
+          const updates: Partial<Application> = { status: newStatus };
+          
+          if (newStatus === 'Interview' && interviewDate) {
+             updates.interviewDate = interviewDate;
+             // Auto-generate a WORKING meeting link (Jitsi) if not present
+             if (!app.meetingLink) {
+                const roomName = `CareerMint-Interview-${Math.random().toString(36).substr(2, 6)}-${Date.now().toString().slice(-4)}`;
+                updates.meetingLink = `https://meet.jit.si/${roomName}`;
+             }
+          }
+          return { ...app, ...updates };
+      }
+      return app;
+    }));
+
+    const app = applications.find(a => a.id === id);
+    if (app) {
+        let meta = `Marked ${app.candidateName} as ${newStatus}`;
+        if (newStatus === 'Interview' && interviewDate) {
+            meta += ` on ${interviewDate.toLocaleDateString()}`;
+        }
+        addActivity("Application Update", meta);
+    }
   };
 
   // Render Views
@@ -100,13 +169,24 @@ function App() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              {currentView === AppView.DASHBOARD && (
+              {/* SHARED OR CANDIDATE VIEWS */}
+              {(currentView === AppView.DASHBOARD || currentView === AppView.EMPLOYER_DASHBOARD) && (
                  <Dashboard 
                    user={user!} 
                    setCurrentView={setCurrentView} 
                    resumeAnalysis={resumeAnalysis}
                    activities={activities}
+                   applications={applications}
+                   jobs={jobs}
                  />
+              )}
+
+              {currentView === AppView.MY_APPLICATIONS && (
+                <MyApplications 
+                  applications={applications}
+                  jobs={jobs}
+                  userEmail={user?.email || ''}
+                />
               )}
 
               {currentView === AppView.INTERVIEW && (
@@ -132,11 +212,42 @@ function App() {
                 <Jobs 
                   resumeAnalysis={resumeAnalysis} 
                   onActivity={addActivity}
+                  jobs={jobs}
+                  setJobs={setJobs}
+                  onApply={handleApplyToJob}
+                  appliedJobIds={new Set(applications.filter(a => a.candidateEmail === user?.email).map(a => a.jobId))}
+                  userRole={user?.role}
+                  applications={applications}
+                  onPostJob={handlePostJob}
+                />
+              )}
+
+              {currentView === AppView.APPLICANTS && (
+                <Applicants 
+                  applications={applications}
+                  jobs={jobs}
+                  onUpdateStatus={handleUpdateApplicationStatus}
+                />
+              )}
+
+              {currentView === AppView.SHORTLISTED && (
+                <Applicants 
+                  applications={applications}
+                  jobs={jobs}
+                  onUpdateStatus={handleUpdateApplicationStatus}
+                  showShortlistedOnly={true}
                 />
               )}
               
               {currentView === AppView.COVER_LETTER && (
                 <CoverLetter 
+                  resumeAnalysis={resumeAnalysis} 
+                  onActivity={addActivity}
+                />
+              )}
+
+              {currentView === AppView.SKILLS && (
+                <SkillSuggestions 
                   resumeAnalysis={resumeAnalysis} 
                   onActivity={addActivity}
                 />

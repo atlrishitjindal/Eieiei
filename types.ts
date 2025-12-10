@@ -1,11 +1,19 @@
+
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
   INTERVIEW = 'INTERVIEW',
   RESUME = 'RESUME',
   INSIGHTS = 'INSIGHTS',
   JOBS = 'JOBS',
-  COVER_LETTER = 'COVER_LETTER'
+  COVER_LETTER = 'COVER_LETTER',
+  SKILLS = 'SKILLS',
+  EMPLOYER_DASHBOARD = 'EMPLOYER_DASHBOARD',
+  APPLICANTS = 'APPLICANTS',
+  SHORTLISTED = 'SHORTLISTED',
+  MY_APPLICATIONS = 'MY_APPLICATIONS'
 }
+
+export type UserRole = 'candidate' | 'employer';
 
 export interface ChatMessage {
   id: string;
@@ -53,6 +61,19 @@ export interface Job {
   postedAt: string;
 }
 
+export interface Application {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  candidateName: string;
+  candidateEmail: string;
+  matchScore: number; // Simulated score
+  status: 'New' | 'Reviewed' | 'Interview' | 'Rejected' | 'Shortlisted';
+  timestamp: Date;
+  interviewDate?: Date;
+  meetingLink?: string;
+}
+
 export interface JobMatchResult {
   matchScore: number;
   summary: string;
@@ -63,8 +84,16 @@ export interface JobMatchResult {
 
 export interface ActivityLog {
   id: string;
-  type: 'interview' | 'resume' | 'job_match' | 'cover_letter';
+  type: 'interview' | 'resume' | 'job_match' | 'cover_letter' | 'skills' | 'recruitment';
   title: string;
   timestamp: Date;
   meta: string;
+}
+
+export interface SkillSuggestion {
+  skill: string;
+  reason: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  category: 'Technical' | 'Soft Skill' | 'Tool';
+  searchQuery: string;
 }

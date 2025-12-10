@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job } from "../types";
+import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job, SkillSuggestion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
 const getAiClient = () => {
@@ -46,6 +46,10 @@ const handleGeminiError = async (error: any): Promise<never> => {
   }
 
   throw new Error(errorMessage);
+};
+
+const cleanJson = (text: string) => {
+  return text.replace(/```json|```/g, '').trim();
 };
 
 export const analyzeResume = async (
@@ -100,7 +104,7 @@ export const analyzeResume = async (
     const text = response.text;
     if (!text) throw new Error("No response received from AI model.");
     
-    return JSON.parse(text) as ResumeAnalysis;
+    return JSON.parse(cleanJson(text)) as ResumeAnalysis;
   } catch (error: any) {
     return handleGeminiError(error);
   }
@@ -150,7 +154,7 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
 
     const text = response.text;
     if (!text) throw new Error("No report generated");
-    return JSON.parse(text) as InterviewReport;
+    return JSON.parse(cleanJson(text)) as InterviewReport;
   } catch (error) {
     return handleGeminiError(error);
   }
@@ -232,7 +236,7 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text) as Job[];
+    return JSON.parse(cleanJson(text)) as Job[];
   } catch (error) {
     return handleGeminiError(error) as any;
   }
@@ -280,7 +284,7 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
 
     const text = response.text;
     if (!text) throw new Error("No response");
-    return JSON.parse(text) as JobMatchResult;
+    return JSON.parse(cleanJson(text)) as JobMatchResult;
   } catch (error) {
     return handleGeminiError(error);
   }
@@ -309,6 +313,52 @@ export const generateCoverLetter = async (resumeSummary: string, jobDescription:
     });
 
     return response.text || "Failed to generate cover letter.";
+  } catch (error) {
+    return handleGeminiError(error) as any;
+  }
+};
+
+export const suggestSkills = async (currentSkills: string[], roleContext: string): Promise<SkillSuggestion[]> => {
+  const ai = getAiClient();
+  const prompt = `Based on the following candidate profile and skills, suggest 6 high-value skills they should learn to advance their career or become more competitive.
+  
+  Role/Context: ${roleContext}
+  Current Skills: ${currentSkills.join(', ')}
+  
+  Return a JSON array of objects. Each object must have:
+  - skill: Name of the skill (e.g. "Docker", "Public Speaking")
+  - reason: Why this skill is valuable for this specific profile (1 sentence).
+  - difficulty: "Beginner", "Intermediate", or "Advanced" based on learning curve relative to their current skills.
+  - category: "Technical", "Soft Skill", or "Tool"
+  - searchQuery: A highly optimized Google search query string to find the BEST FREE OR PAID COURSE for this skill (e.g. "Docker complete course for beginners" or "Advanced React patterns course").
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              skill: { type: Type.STRING },
+              reason: { type: Type.STRING },
+              difficulty: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
+              category: { type: Type.STRING, enum: ["Technical", "Soft Skill", "Tool"] },
+              searchQuery: { type: Type.STRING }
+            },
+            required: ["skill", "reason", "difficulty", "category", "searchQuery"]
+          }
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) return [];
+    return JSON.parse(cleanJson(text)) as SkillSuggestion[];
   } catch (error) {
     return handleGeminiError(error) as any;
   }
