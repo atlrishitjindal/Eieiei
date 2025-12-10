@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ArrowRight, Github, Chrome, Command, Briefcase, User, AlertCircle, ArrowLeft, CheckCircle, KeyRound, Mail, Info } from 'lucide-react';
+import { ArrowRight, Github, Chrome, Command, Briefcase, User, AlertCircle, ArrowLeft, CheckCircle, KeyRound, Mail, Info, Copy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Input, Card } from './ui/DesignSystem';
 import { UserRole } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
 interface AuthProps {
-  onComplete: (user: { name: string; email: string; role: UserRole }) => void;
+  onComplete: (user: { name: string; email: string; role: UserRole; id: string; phone?: string; address?: string }) => void;
   initialMode?: 'login' | 'signup';
 }
 
@@ -80,7 +80,10 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
           onComplete({
             name: data.user.user_metadata.full_name || cleanEmail.split('@')[0],
             email: data.user.email || cleanEmail,
-            role: (data.user.user_metadata.role as UserRole) || 'candidate'
+            role: (data.user.user_metadata.role as UserRole) || 'candidate',
+            id: data.user.id,
+            phone: data.user.user_metadata.phone,
+            address: data.user.user_metadata.address
           });
         }
       } else if (mode === 'forgot_password') {
@@ -178,18 +181,18 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
                 <p className="text-slate-500 text-sm leading-relaxed">
                   We've sent a password reset link to <strong>{email}</strong>.
                 </p>
-                <div className="mt-6 bg-slate-50 p-4 rounded-lg text-left text-xs text-slate-500 space-y-3">
+                <div className="mt-6 bg-slate-50 p-4 rounded-lg text-left text-xs text-slate-500 space-y-3 border border-slate-100">
                   <div className="flex items-center gap-2 text-slate-700 font-semibold border-b border-slate-200 pb-2">
-                    <Info className="w-4 h-4" /> Troubleshooting
+                    <Info className="w-4 h-4" /> Facing Some Issues?
                   </div>
-                  <ul className="list-disc pl-4 space-y-2">
+                  <ul className="list-disc pl-4 space-y-2 leading-normal">
                     <li>Check your <strong>Spam</strong> or Junk folder.</li>
                     <li>
-                      The link redirects to: <br/>
-                      <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-700 font-mono mt-1 inline-block break-all">{window.location.origin}</code>
+                      <strong>Reset link opens a blank page:</strong><br/>
+                      Your app must not be running in the same browser session.
                     </li>
-                    <li className="text-amber-600 font-medium">
-                      If you see <strong>"Connection Refused"</strong>, ensure the URL above is added to your Supabase Redirect URLs.
+                    <li className="text-brand-700 font-semibold bg-brand-50 p-2 rounded">
+                      Fix: Right-click the link in email, select "Copy Link", and paste it into THIS tab's address bar.
                     </li>
                   </ul>
                 </div>

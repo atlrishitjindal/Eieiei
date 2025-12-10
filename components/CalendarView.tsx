@@ -144,7 +144,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ applications, user }) => {
                         
                         <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <Video className="w-3.5 h-3.5" /> Google Meet
+                              <Video className="w-3.5 h-3.5" /> Jitsi Meet
                            </div>
                            {app.meetingLink && (
                               <a 

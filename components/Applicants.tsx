@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Mail, CheckCircle, XCircle, Search, Filter, FileText, Download, Calendar, X, ThumbsDown, Bookmark, ExternalLink, Eye, ThumbsUp } from 'lucide-react';
+import { Users, Mail, CheckCircle, XCircle, Search, Filter, FileText, Download, Calendar, X, ThumbsDown, Bookmark, ExternalLink, Eye, ChevronLeft, ChevronRight, Clock, RefreshCw } from 'lucide-react';
 import { Application, Job } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, Badge, Input } from './ui/DesignSystem';
@@ -21,6 +21,9 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
   const [showScheduleInput, setShowScheduleInput] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
+  
+  // Calendar State
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Keep selectedApp in sync with applications prop (so when link is generated, it shows up)
   useEffect(() => {
@@ -66,18 +69,44 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
 
   const handleConfirmSchedule = () => {
      if (selectedApp && scheduleDate && scheduleTime && onUpdateStatus) {
-        const dateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+        // Construct date explicitly to ensure local time is preserved correctly across browsers
+        const [year, month, day] = scheduleDate.split('-').map(Number);
+        const [hour, minute] = scheduleTime.split(':').map(Number);
+        
+        // Note: Month is 0-indexed in Date constructor
+        const dateTime = new Date(year, month - 1, day, hour, minute);
+        
         onUpdateStatus(selectedApp.id, 'Interview', dateTime);
-        // Note: The meeting link is generated in App.tsx and will propagate back via props/useEffect
+        
         setShowScheduleInput(false);
         setScheduleDate('');
         setScheduleTime('');
      }
   };
 
+  const handleReschedule = () => {
+    if (selectedApp && selectedApp.interviewDate) {
+      const date = new Date(selectedApp.interviewDate);
+      setCurrentMonth(date);
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      setScheduleDate(`${year}-${month}-${day}`);
+
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      setScheduleTime(`${hours}:${minutes}`);
+    }
+    setShowScheduleInput(true);
+  };
+
   const openModal = (app: Application) => {
      setSelectedApp(app);
      setShowScheduleInput(false); // Reset schedule state on new open
+     setScheduleDate('');
+     setScheduleTime('');
+     setCurrentMonth(new Date());
   };
 
   const handleDownloadResume = () => {
@@ -131,6 +160,47 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
     document.body.removeChild(link);
   };
 
+  // Calendar Helpers
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
+    return { daysInMonth, firstDayOfWeek };
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+
+  const handleDateSelect = (day: number) => {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    // Format to YYYY-MM-DD local time manually to avoid timezone shifts
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    setScheduleDate(`${year}-${month}-${d}`);
+  };
+
+  const handleTimeChange = (type: 'hour' | 'minute', value: string) => {
+    const [currentHour, currentMinute] = scheduleTime ? scheduleTime.split(':') : ['', ''];
+    let newHour = currentHour || '09'; // Default to 09 if no hour set yet
+    let newMinute = currentMinute || '00'; // Default to 00 if no minute set yet
+
+    if (type === 'hour') {
+        newHour = value;
+    } else {
+        newMinute = value;
+    }
+    setScheduleTime(`${newHour}:${newMinute}`);
+  };
+
+  const { daysInMonth, firstDayOfWeek } = getDaysInMonth(currentMonth);
+
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       
@@ -142,10 +212,10 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex overflow-hidden"
+              className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex overflow-hidden"
             >
               {/* Left: Resume Preview (Mock) */}
-              <div className="flex-1 bg-slate-100 border-r border-slate-200 p-8 overflow-y-auto hidden md:block">
+              <div className="flex-1 bg-slate-100 border-r border-slate-200 p-8 overflow-y-auto hidden md:block custom-scrollbar">
                  <div className="bg-white shadow-lg min-h-[800px] w-full max-w-[800px] mx-auto p-12 space-y-8 text-slate-800">
                     <div className="border-b border-slate-200 pb-8 flex justify-between items-start">
                        <div>
@@ -154,8 +224,8 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
                        </div>
                        <div className="text-right text-sm text-slate-500 space-y-1">
                           <p>{selectedApp.candidateEmail}</p>
-                          <p>+1 (555) 123-4567</p>
-                          <p>San Francisco, CA</p>
+                          <p>{selectedApp.candidatePhone || "+1 (555) 123-4567"}</p>
+                          <p>{selectedApp.candidateAddress || "San Francisco, CA"}</p>
                        </div>
                     </div>
                     
@@ -208,7 +278,7 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
               </div>
 
               {/* Right: Controls & Info */}
-              <div className="w-full md:w-96 bg-white flex flex-col z-10 shadow-xl">
+              <div className="w-full md:w-[450px] bg-white flex flex-col z-10 shadow-xl">
                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="font-bold text-slate-900">Application Review</h3>
                     <button onClick={() => setSelectedApp(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
@@ -216,7 +286,7 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
                     </button>
                  </div>
 
-                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                     {/* Match Score */}
                     <div className="text-center">
                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-50 border-4 border-white shadow-lg mb-3 relative">
@@ -262,43 +332,146 @@ const Applicants: React.FC<ApplicantsProps> = ({ applications, jobs, onUpdateSta
                           </button>
                        </div>
 
-                       {/* Interview Scheduler */}
+                       {/* Interview Scheduler - NEW CUSTOM UI */}
                        {showScheduleInput && (
-                          <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg mt-4 animate-in fade-in slide-in-from-top-2">
-                             <h4 className="text-sm font-bold text-slate-900 mb-3">Schedule Interview</h4>
-                             <div className="space-y-3">
-                                <div>
-                                   <label className="text-xs font-semibold text-slate-500 mb-1 block">Date</label>
-                                   <Input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="bg-white" />
-                                </div>
-                                <div>
-                                   <label className="text-xs font-semibold text-slate-500 mb-1 block">Time</label>
-                                   <Input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} className="bg-white" />
-                                </div>
-                                <div className="flex gap-2 pt-2">
-                                   <Button onClick={handleConfirmSchedule} disabled={!scheduleDate || !scheduleTime} size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700">Confirm</Button>
-                                   <Button onClick={() => setShowScheduleInput(false)} variant="secondary" size="sm">Cancel</Button>
-                                </div>
+                          <div className="bg-white border border-slate-200 shadow-lg rounded-xl p-0 mt-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                             <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                 <h4 className="text-sm font-bold text-slate-900">
+                                   {selectedApp.interviewDate ? 'Reschedule Interview' : 'Schedule Interview'}
+                                 </h4>
+                                 <button onClick={() => setShowScheduleInput(false)} className="hover:text-red-500"><X className="w-4 h-4 text-slate-400"/></button>
+                             </div>
+                             
+                             <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                                 {/* Calendar Section */}
+                                 <div className="p-4 flex-1">
+                                      {/* Header */}
+                                      <div className="flex items-center justify-between mb-4">
+                                          <button onClick={handlePrevMonth} className="p-1 hover:bg-slate-100 rounded text-slate-600"><ChevronLeft className="w-4 h-4"/></button>
+                                          <span className="text-sm font-semibold text-slate-900">{currentMonth.toLocaleDateString('default', {month: 'long', year: 'numeric'})}</span>
+                                          <button onClick={handleNextMonth} className="p-1 hover:bg-slate-100 rounded text-slate-600"><ChevronRight className="w-4 h-4"/></button>
+                                      </div>
+                                      {/* Grid */}
+                                      <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                                          {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <span key={d} className="text-[10px] text-slate-400 font-bold uppercase">{d}</span>)}
+                                      </div>
+                                      <div className="grid grid-cols-7 gap-1">
+                                          {/* Empty slots */}
+                                          {Array.from({length: firstDayOfWeek}).map((_, i) => <div key={`empty-${i}`} />)}
+                                          {/* Days */}
+                                          {Array.from({length: daysInMonth}).map((_, i) => {
+                                              const day = i + 1;
+                                              const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                                              const year = date.getFullYear();
+                                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                                              const d = String(date.getDate()).padStart(2, '0');
+                                              const dateStr = `${year}-${month}-${d}`;
+                                              
+                                              const isSelected = scheduleDate === dateStr;
+                                              const isToday = new Date().toDateString() === date.toDateString();
+
+                                              return (
+                                                  <button 
+                                                     key={day}
+                                                     onClick={() => handleDateSelect(day)}
+                                                     className={cn(
+                                                         "w-8 h-8 rounded-full text-xs flex items-center justify-center transition-all",
+                                                         isSelected 
+                                                            ? "bg-purple-600 text-white font-bold shadow-md" 
+                                                            : isToday 
+                                                                ? "text-purple-600 font-bold bg-purple-50" 
+                                                                : "hover:bg-slate-100 text-slate-700"
+                                                     )}
+                                                  >
+                                                     {day}
+                                                  </button>
+                                              )
+                                          })}
+                                      </div>
+                                 </div>
+
+                                 {/* Time Section */}
+                                 <div className="p-4 w-full md:w-56 bg-slate-50/50 flex flex-col border-l border-slate-100">
+                                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                         <Clock className="w-3 h-3" /> Select Time
+                                      </div>
+                                      <div className="flex gap-2 flex-1 overflow-hidden h-[160px]">
+                                          {/* Hours */}
+                                          <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-1">
+                                              <div className="text-[10px] text-center text-slate-300 font-bold mb-1 sticky top-0 bg-slate-50">HR</div>
+                                              <div className="space-y-1">
+                                                {Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0')).map(h => (
+                                                    <button
+                                                        key={h}
+                                                        onClick={() => handleTimeChange('hour', h)}
+                                                        className={cn(
+                                                            "w-full py-1.5 rounded-md text-xs font-medium transition-all text-center border border-transparent",
+                                                            scheduleTime.startsWith(h + ':') 
+                                                                ? "bg-purple-600 text-white shadow-sm" 
+                                                                : "text-slate-600 hover:bg-white hover:border-slate-200"
+                                                        )}
+                                                    >
+                                                        {h}
+                                                    </button>
+                                                ))}
+                                              </div>
+                                          </div>
+                                          {/* Separator */}
+                                          <div className="h-full w-px bg-slate-200 my-2"></div>
+                                          {/* Minutes */}
+                                          <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-1">
+                                              <div className="text-[10px] text-center text-slate-300 font-bold mb-1 sticky top-0 bg-slate-50">MIN</div>
+                                              <div className="space-y-1">
+                                                {Array.from({length: 60}, (_, i) => i.toString().padStart(2, '0')).map(m => (
+                                                    <button
+                                                        key={m}
+                                                        onClick={() => handleTimeChange('minute', m)}
+                                                        className={cn(
+                                                            "w-full py-1.5 rounded-md text-xs font-medium transition-all text-center border border-transparent",
+                                                            scheduleTime.endsWith(':' + m)
+                                                                ? "bg-purple-600 text-white shadow-sm" 
+                                                                : "text-slate-600 hover:bg-white hover:border-slate-200"
+                                                        )}
+                                                    >
+                                                        {m}
+                                                    </button>
+                                                ))}
+                                              </div>
+                                          </div>
+                                      </div>
+                                 </div>
+                             </div>
+
+                             <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+                                 <Button onClick={() => setShowScheduleInput(false)} variant="secondary" size="sm" className="h-8 text-xs">Cancel</Button>
+                                 <Button onClick={handleConfirmSchedule} disabled={!scheduleDate || !scheduleTime} size="sm" className="bg-purple-600 hover:bg-purple-700 h-8 text-xs">
+                                     {selectedApp.interviewDate ? 'Reschedule' : 'Confirm'}
+                                 </Button>
                              </div>
                           </div>
                        )}
 
                        {selectedApp.interviewDate && !showScheduleInput && selectedApp.status === 'Interview' && (
                           <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-lg mt-4 space-y-3">
-                             <div className="flex items-start gap-3">
-                               <Calendar className="w-5 h-5 text-emerald-600 mt-0.5" />
-                               <div>
-                                  <h4 className="text-sm font-bold text-emerald-900">Interview Scheduled</h4>
-                                  <p className="text-xs text-emerald-700">
-                                     {new Date(selectedApp.interviewDate).toLocaleDateString()} at {new Date(selectedApp.interviewDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                  </p>
-                               </div>
+                             <div className="flex justify-between items-start">
+                                 <div className="flex items-start gap-3">
+                                   <Calendar className="w-5 h-5 text-emerald-600 mt-0.5" />
+                                   <div>
+                                      <h4 className="text-sm font-bold text-emerald-900">Interview Scheduled</h4>
+                                      <p className="text-xs text-emerald-700">
+                                         {new Date(selectedApp.interviewDate).toLocaleDateString()} at {new Date(selectedApp.interviewDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                      </p>
+                                   </div>
+                                 </div>
+                                 <Button onClick={handleReschedule} variant="ghost" size="sm" className="h-6 text-[10px] text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 -mt-1 -mr-1">
+                                    Reschedule
+                                 </Button>
                              </div>
                              
                              {selectedApp.meetingLink && (
                                 <div className="pl-8">
                                    <a href={selectedApp.meetingLink} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 font-medium hover:underline flex items-center gap-1 bg-emerald-100/50 px-2 py-1 rounded w-fit">
-                                     Join Google Meet <ExternalLink className="w-3 h-3" />
+                                     Join Jitsi Meet <ExternalLink className="w-3 h-3" />
                                    </a>
                                 </div>
                              )}

@@ -1,328 +1,429 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { Mic, MicOff, Volume2, Loader2, Play, Square, FileText, CheckCircle, BarChart, XCircle } from 'lucide-react';
-import { base64ToBytes, createPcmBlob, decodeAudioData, downsampleBuffer } from '../services/audioUtils';
-import { generateInterviewReport } from '../services/gemini';
-import { InterviewReport, ResumeAnalysis } from '../types';
-import { motion } from 'framer-motion';
+import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
 import { cn } from '../lib/utils';
+import { createPcmBlob, decodeAudioData, base64ToBytes } from '../services/audioUtils';
 
 interface LiveInterviewProps {
   resumeAnalysis: ResumeAnalysis | null;
 }
 
-interface Transcription {
-  role: 'user' | 'model';
-  text: string;
-}
-
 const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
-  const [isActive, setIsActive] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOn, setIsVideoOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [transcripts, setTranscripts] = useState<Transcription[]>([]);
-  const [interimTranscript, setInterimTranscript] = useState<{ role: 'user' | 'model'; text: string } | null>(null);
-  const [currentInputVolume, setCurrentInputVolume] = useState(0);
-  const [report, setReport] = useState<InterviewReport | null>(null);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [volume, setVolume] = useState(0);
 
+  // Refs for audio context and processing
   const audioContextRef = useRef<AudioContext | null>(null);
-  const inputContextRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const nextStartTimeRef = useRef<number>(0);
-  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  
-  const currentInputTransRef = useRef<string>('');
-  const currentOutputTransRef = useRef<string>('');
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const sessionPromiseRef = useRef<Promise<any> | null>(null);
+  const nextStartTimeRef = useRef<number>(0);
+  const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  
+  // Canvas ref for video frame capture
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameIntervalRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcripts, interimTranscript]);
+  // Initialize Gemini Client
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const stopSession = useCallback(async () => {
-    setIsActive(false);
-    setIsConnecting(false);
-    setCurrentInputVolume(0);
-    setInterimTranscript(null);
+  const stopAudio = () => {
+     if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+     }
+     if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+     }
+     if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+     }
+     if (inputSourceRef.current) {
+        inputSourceRef.current.disconnect();
+        inputSourceRef.current = null;
+     }
+     // Stop all playing sources
+     audioSourcesRef.current.forEach(source => {
+        try { source.stop(); } catch (e) {}
+     });
+     audioSourcesRef.current.clear();
+  };
+  
+  const stopVideo = () => {
+    if (frameIntervalRef.current) {
+        clearInterval(frameIntervalRef.current);
+        frameIntervalRef.current = null;
+    }
+    if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach(track => track.stop());
+        videoStreamRef.current = null;
+    }
+    setIsVideoOn(false);
+  };
 
-    if (sessionPromiseRef.current) {
-      try {
-        const session = await sessionPromiseRef.current;
-        session.close();
-      } catch (e) {}
-      sessionPromiseRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    if (audioContextRef.current) {
-      try { await audioContextRef.current.close(); } catch(e) {}
-      audioContextRef.current = null;
-    }
-    if (inputContextRef.current) {
-      try { await inputContextRef.current.close(); } catch(e) {}
-      inputContextRef.current = null;
-    }
-    sourcesRef.current.forEach(source => {
-      try { source.stop(); } catch(e) {}
-    });
-    sourcesRef.current.clear();
-  }, []);
+  const disconnect = async () => {
+     if (sessionPromiseRef.current) {
+         try {
+             const session = await sessionPromiseRef.current;
+             session.close();
+         } catch (e) {
+             console.error("Error closing session", e);
+         }
+         sessionPromiseRef.current = null;
+     }
+     stopAudio();
+     stopVideo();
+     setIsConnected(false);
+     setIsConnecting(false);
+  };
 
-  const startSession = async () => {
-    setError(null);
-    setReport(null);
-    setTranscripts([]);
-    setInterimTranscript(null);
+  const connect = async () => {
+    if (!resumeAnalysis) {
+        setError("Please upload a resume first to start the interview simulation.");
+        return;
+    }
+    
     setIsConnecting(true);
+    setError(null);
 
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("API Key missing");
-      const ai = new GoogleGenAI({ apiKey });
-      const contextPrompt = resumeAnalysis 
-        ? `The candidate's summary: "${resumeAnalysis.summary}". Skills: ${resumeAnalysis.skills?.join(', ')}. Tailor questions.` 
-        : "Ask general behavioral questions suitable for any professional role.";
-      const systemInstruction = `You are an expert hiring manager. CONTEXT: ${contextPrompt} RULES: Speak English. Ask ONE question at a time. Provide brief feedback.`;
-
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const inputCtx = new AudioContextClass(); 
-      const outputCtx = new AudioContextClass({ sampleRate: 24000 });
-      inputContextRef.current = inputCtx;
-      audioContextRef.current = outputCtx;
-      nextStartTimeRef.current = 0;
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } });
+      // 1. Setup Audio Contexts
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      nextStartTimeRef.current = audioContextRef.current.currentTime;
+      
+      // 2. Get Microphone Stream
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          autoGainControl: true,
+          noiseSuppression: true
+      } });
       streamRef.current = stream;
 
+      // 3. Connect to Gemini Live
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-          systemInstruction: systemInstruction,
-          inputAudioTranscription: {}, 
-          outputAudioTranscription: {},
+            responseModalities: [Modality.AUDIO],
+            systemInstruction: `You are an experienced hiring manager conducting a job interview. 
+            The candidate's summary is: "${resumeAnalysis.summary}". 
+            Their key strengths are: ${resumeAnalysis.strengths.join(', ')}.
+            
+            Your goal is to assess their fit for a Senior role similar to their experience.
+            Start by welcoming them and asking a relevant opening question based on their resume.
+            Keep your responses concise and conversational. Do not be too verbose.
+            If the candidate struggles, offer a small hint or move to a different topic.
+            Be professional but encouraging.`,
+            speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
+            }
         },
         callbacks: {
-          onopen: () => {
-            setIsActive(true);
-            setIsConnecting(false);
-            const source = inputCtx.createMediaStreamSource(stream);
-            const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
-            processorRef.current = scriptProcessor;
-            scriptProcessor.onaudioprocess = (e) => {
-              const inputData = e.inputBuffer.getChannelData(0);
-              let sum = 0;
-              for(let i=0; i<inputData.length; i+=10) sum += inputData[i] * inputData[i]; 
-              const rms = Math.sqrt(sum / (inputData.length/10));
-              setCurrentInputVolume(Math.min(100, rms * 1000));
-              const downsampledData = downsampleBuffer(inputData, inputCtx.sampleRate, 16000);
-              sessionPromise.then(session => session.sendRealtimeInput({ media: createPcmBlob(downsampledData) })).catch(() => {});
-            };
-            source.connect(scriptProcessor);
-            scriptProcessor.connect(inputCtx.destination);
-          },
-          onmessage: async (message: LiveServerMessage) => {
-             let userSpeaking = false;
-             let modelSpeaking = false;
-             if (message.serverContent?.outputTranscription) {
-               currentOutputTransRef.current += message.serverContent.outputTranscription.text;
-               modelSpeaking = true;
-             } else if (message.serverContent?.inputTranscription) {
-               currentInputTransRef.current += message.serverContent.inputTranscription.text;
-               userSpeaking = true;
-             }
-             if (userSpeaking) setInterimTranscript({ role: 'user', text: currentInputTransRef.current });
-             else if (modelSpeaking) setInterimTranscript({ role: 'model', text: currentOutputTransRef.current });
+            onopen: async () => {
+                console.log("Gemini Live Session Opened");
+                setIsConnected(true);
+                setIsConnecting(false);
+                
+                // Start Audio Processing Pipeline
+                if (!audioContextRef.current || !streamRef.current) return;
+                
+                // Use a separate input context for 16kHz capture if needed
+                const inputContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+                const source = inputContext.createMediaStreamSource(streamRef.current);
+                inputSourceRef.current = source;
+                
+                const processor = inputContext.createScriptProcessor(4096, 1, 1);
+                processorRef.current = processor;
+                
+                processor.onaudioprocess = (e) => {
+                    if (isMuted) return; // Don't send data if muted
+                    
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    
+                    // Simple volume meter
+                    let sum = 0;
+                    for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
+                    setVolume(Math.sqrt(sum / inputData.length));
 
-             if (message.serverContent?.turnComplete) {
-               const userText = currentInputTransRef.current.trim();
-               const modelText = currentOutputTransRef.current.trim();
-               if (userText || modelText) {
-                 setTranscripts(prev => [
-                   ...prev,
-                   ...(userText ? [{ role: 'user', text: userText } as Transcription] : []),
-                   ...(modelText ? [{ role: 'model', text: modelText } as Transcription] : [])
-                 ]);
-               }
-               currentInputTransRef.current = '';
-               currentOutputTransRef.current = '';
-               setInterimTranscript(null);
-             }
-
-             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-             if (base64Audio && outputCtx) {
-                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
-                const audioBuffer = await decodeAudioData(base64ToBytes(base64Audio), outputCtx, 24000, 1);
-                const source = outputCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(outputCtx.destination);
-                source.addEventListener('ended', () => sourcesRef.current.delete(source));
-                source.start(nextStartTimeRef.current);
-                nextStartTimeRef.current += audioBuffer.duration;
-                sourcesRef.current.add(source);
-             }
-          },
-          onclose: () => stopSession(),
-          onerror: (e) => { setError("Connection failed."); stopSession(); }
+                    const pcmBlob = createPcmBlob(inputData);
+                    
+                    if (sessionPromiseRef.current) {
+                        sessionPromiseRef.current.then(session => {
+                            try {
+                                session.sendRealtimeInput({ media: pcmBlob });
+                            } catch (err) {
+                                console.error("Error sending audio input", err);
+                            }
+                        });
+                    }
+                };
+                
+                source.connect(processor);
+                processor.connect(inputContext.destination);
+            },
+            onmessage: async (message: LiveServerMessage) => {
+                const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+                
+                if (base64Audio && audioContextRef.current) {
+                    try {
+                        const audioBytes = base64ToBytes(base64Audio);
+                        const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
+                        
+                        const source = audioContextRef.current.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(audioContextRef.current.destination);
+                        
+                        // Schedule playback
+                        const currentTime = audioContextRef.current.currentTime;
+                        if (nextStartTimeRef.current < currentTime) {
+                            nextStartTimeRef.current = currentTime;
+                        }
+                        
+                        source.start(nextStartTimeRef.current);
+                        nextStartTimeRef.current += audioBuffer.duration;
+                        
+                        audioSourcesRef.current.add(source);
+                        source.onended = () => {
+                            audioSourcesRef.current.delete(source);
+                        };
+                    } catch (e) {
+                        console.error("Error processing audio message", e);
+                    }
+                }
+                
+                const interrupted = message.serverContent?.interrupted;
+                if (interrupted) {
+                    audioSourcesRef.current.forEach(s => s.stop());
+                    audioSourcesRef.current.clear();
+                    if (audioContextRef.current) {
+                        nextStartTimeRef.current = audioContextRef.current.currentTime;
+                    }
+                }
+            },
+            onclose: () => {
+                console.log("Gemini Live Session Closed");
+                disconnect();
+            },
+            onerror: (err) => {
+                console.error("Gemini Live Session Error", err);
+                setError("Connection lost. Please try again.");
+                disconnect();
+            }
         }
       });
+      
       sessionPromiseRef.current = sessionPromise;
+
     } catch (err: any) {
-      setError(err.message || "Failed to start");
-      setIsConnecting(false);
-      stopSession();
+        console.error("Failed to connect", err);
+        setError(err.message || "Failed to start interview session.");
+        setIsConnecting(false);
+        disconnect();
     }
   };
 
-  const handleGenerateReport = async () => {
-    if (transcripts.length === 0) return;
-    setIsGeneratingReport(true);
-    try {
-      const fullText = transcripts.map(t => `${t.role.toUpperCase()}: ${t.text}`).join('\n');
-      const data = await generateInterviewReport(fullText);
-      setReport(data);
-    } finally {
-      setIsGeneratingReport(false);
-    }
+  const toggleMute = () => {
+      setIsMuted(!isMuted);
+  };
+  
+  const toggleVideo = async () => {
+      if (isVideoOn) {
+          stopVideo();
+      } else {
+          try {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+              videoStreamRef.current = stream;
+              if (videoRef.current) {
+                  videoRef.current.srcObject = stream;
+              }
+              setIsVideoOn(true);
+              
+              // Start frame capture
+              startVideoStreaming();
+          } catch (e) {
+              console.error("Failed to access camera", e);
+          }
+      }
+  };
+  
+  const startVideoStreaming = () => {
+      if (!canvasRef.current || !videoRef.current) return;
+      
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const video = videoRef.current;
+      
+      frameIntervalRef.current = window.setInterval(async () => {
+          if (!ctx || !video.videoWidth) return;
+          
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          
+          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+          
+          if (sessionPromiseRef.current) {
+              sessionPromiseRef.current.then(session => {
+                 try {
+                     session.sendRealtimeInput({
+                         media: {
+                             mimeType: 'image/jpeg',
+                             data: base64Data
+                         }
+                     });
+                 } catch(e) {
+                     // ignore send errors
+                 }
+              });
+          }
+      }, 1000);
   };
 
+  // Cleanup on unmount
   useEffect(() => {
-    return () => { stopSession(); };
-  }, [stopSession]);
+      return () => {
+          disconnect();
+      };
+  }, []);
+
+  if (!resumeAnalysis) {
+      return (
+        <Card className="flex flex-col items-center justify-center min-h-[400px] text-center p-12 bg-white shadow-none border border-slate-200 rounded-2xl">
+          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+             <Mic className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Resume Required</h3>
+          <p className="text-slate-500 max-w-md">Please upload your resume first so the AI interviewer can ask relevant questions.</p>
+        </Card>
+      );
+  }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6">
-      {/* Left Panel: Active Session */}
-      <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-        <div className="flex-none">
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight font-display">Interview Simulator</h2>
-          <p className="text-slate-500">Practice with our AI hiring manager. We'll analyze your responses.</p>
-        </div>
-
-        <Card className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-white shadow-lg border-slate-200">
-          {/* Visualizer Background */}
-          {isActive && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-               <motion.div 
-                animate={{ scale: [1, 1 + currentInputVolume * 0.05, 1], opacity: [0.1, 0.2, 0.1] }}
-                className="w-96 h-96 rounded-full bg-slate-100 blur-3xl"
-               />
-            </div>
-          )}
-
-          <div className="relative z-10 text-center space-y-8">
-            <div className="h-32 flex items-center justify-center">
-              {isConnecting ? (
-                <div className="flex flex-col items-center gap-3 text-brand-600">
-                  <Loader2 className="w-8 h-8 animate-spin" />
-                  <span className="font-medium">Connecting to AI Interviewer...</span>
-                </div>
-              ) : isActive ? (
-                <div className="relative">
-                   <div className="w-24 h-24 rounded-full bg-white border-4 border-slate-100 flex items-center justify-center shadow-2xl relative z-10">
-                     <Mic className="w-10 h-10 text-brand-600" />
-                   </div>
-                   <motion.div 
-                     animate={{ scale: 1.5, opacity: 0 }} 
-                     transition={{ repeat: Infinity, duration: 2 }}
-                     className="absolute inset-0 bg-slate-200 rounded-full"
-                   />
-                </div>
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
-                  <MicOff className="w-10 h-10" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-4 justify-center">
-               {!isActive ? (
-                 <Button onClick={startSession} disabled={isConnecting} variant="primary" size="lg" className="rounded-full px-8 shadow-xl shadow-brand-500/20">
-                   <Play className="w-5 h-5 mr-2" /> Start Interview
-                 </Button>
-               ) : (
-                 <Button onClick={stopSession} variant="danger" size="lg" className="rounded-full px-8 shadow-sm">
-                   <Square className="w-5 h-5 mr-2 fill-current" /> End Session
-                 </Button>
-               )}
-               
-               {transcripts.length > 0 && !isActive && !report && (
-                 <Button onClick={handleGenerateReport} disabled={isGeneratingReport} variant="secondary" className="rounded-full">
-                   {isGeneratingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
-                   Generate Report
-                 </Button>
-               )}
-            </div>
-            
-            {error && <p className="text-red-500 text-sm font-medium bg-red-50 px-3 py-1 rounded-full inline-block">{error}</p>}
-          </div>
-        </Card>
-
-        {/* Report Panel */}
-        {report && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex-none">
-            <Card className="border-slate-200 bg-white p-6 shadow-md">
-               <div className="flex items-center justify-between mb-6">
-                 <h3 className="text-lg font-bold text-slate-900">Performance Report</h3>
-                 <Badge variant="info" className="text-lg px-3 py-1">Score: {report.overallScore}/100</Badge>
-               </div>
-               <div className="grid grid-cols-2 gap-6">
-                 <div>
-                   <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block mb-2">Strengths</span>
-                   <ul className="space-y-2 text-sm text-slate-600">
-                     {report.strengths.slice(0,3).map((s,i) => <li key={i} className="flex gap-2"><CheckCircle className="w-4 h-4 text-emerald-500 flex-none mt-0.5"/> {s}</li>)}
-                   </ul>
-                 </div>
-                 <div>
-                   <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block mb-2">Improvements</span>
-                   <ul className="space-y-2 text-sm text-slate-600">
-                     {report.improvements.slice(0,3).map((s,i) => <li key={i} className="flex gap-2"><BarChart className="w-4 h-4 text-amber-500 flex-none mt-0.5"/> {s}</li>)}
-                   </ul>
-                 </div>
-               </div>
-            </Card>
-          </motion.div>
-        )}
+    <div className="flex flex-col h-full max-h-[calc(100vh-8rem)]">
+      <div className="flex items-center justify-between mb-6">
+         <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight font-display">Live Interview Sim</h1>
+            <p className="text-slate-500 mt-2">Real-time voice practice with an AI hiring manager.</p>
+         </div>
+         {isConnected && (
+             <Badge variant="error" className="animate-pulse bg-red-50 text-red-600 border-red-200">
+                <div className="w-2 h-2 rounded-full bg-red-600 mr-2" /> Live
+             </Badge>
+         )}
       </div>
 
-      {/* Right Panel: Transcript */}
-      <Card className="w-full lg:w-96 flex flex-col h-full bg-white border-slate-200 p-0 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-100 bg-slate-50">
-          <h3 className="font-semibold text-slate-700 text-sm">Live Transcript</h3>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
-          {transcripts.map((msg, idx) => (
-            <div key={idx} className={cn("flex flex-col max-w-[85%]", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
-              <div className={cn(
-                "px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm",
-                msg.role === 'user' ? "bg-brand-600 text-white rounded-tr-sm" : "bg-slate-100 text-slate-700 rounded-tl-sm"
-              )}>
-                {msg.text}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 capitalize font-medium">{msg.role}</span>
-            </div>
-          ))}
-          {interimTranscript && (
-             <div className={cn("flex flex-col max-w-[85%] animate-pulse", interimTranscript.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
-               <div className={cn("px-4 py-2.5 rounded-2xl text-sm opacity-70", interimTranscript.role === 'user' ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700")}>
-                 {interimTranscript.text} ...
-               </div>
+      <Card className="flex-1 bg-slate-900 border-slate-800 relative overflow-hidden flex flex-col">
+          {/* Main Visual Area */}
+          <div className="flex-1 relative flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center">
+             <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" />
+             
+             {/* AI Avatar / Visualization */}
+             <div className="relative z-10 flex flex-col items-center gap-6">
+                <div className={cn(
+                    "w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 relative",
+                    isConnected ? "bg-purple-600 shadow-[0_0_40px_-10px_rgba(147,51,234,0.5)] scale-110" : "bg-slate-700"
+                )}>
+                    {isConnected ? (
+                        <>
+                           {/* Simple visualizer ring */}
+                           <div className="absolute inset-0 rounded-full border-2 border-purple-400 opacity-50 animate-ping" style={{ animationDuration: '2s' }} />
+                           <Volume2 className="w-12 h-12 text-white" />
+                        </>
+                    ) : (
+                        <Mic className="w-12 h-12 text-slate-400" />
+                    )}
+                </div>
+                
+                <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-bold text-white">AI Interviewer</h3>
+                    <p className="text-slate-400 max-w-md">
+                        {isConnected 
+                          ? "Listening..." 
+                          : "Ready to start. Ensure your microphone is enabled."}
+                    </p>
+                </div>
              </div>
+             
+             {/* Self View (Video) */}
+             <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg border border-slate-700 overflow-hidden shadow-xl">
+                 {isVideoOn ? (
+                     <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                 ) : (
+                     <div className="w-full h-full flex items-center justify-center text-slate-600">
+                         <VideoOff className="w-8 h-8" />
+                     </div>
+                 )}
+                 <div className="absolute bottom-2 left-2 flex gap-2">
+                      <div className={cn("w-2 h-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
+                 </div>
+             </div>
+          </div>
+
+          {/* Controls Bar */}
+          <div className="p-6 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-6 relative z-20">
+              {!isConnected ? (
+                  <Button 
+                    size="xl" 
+                    onClick={connect} 
+                    disabled={isConnecting}
+                    className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20 rounded-full px-8"
+                  >
+                    {isConnecting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Mic className="w-5 h-5 mr-2" />}
+                    Start Interview
+                  </Button>
+              ) : (
+                  <>
+                      <button 
+                         onClick={toggleMute}
+                         className={cn(
+                             "w-14 h-14 rounded-full flex items-center justify-center transition-all",
+                             isMuted ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-slate-800 text-white hover:bg-slate-700"
+                         )}
+                      >
+                          {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                      </button>
+                      
+                      <button 
+                         onClick={toggleVideo}
+                         className={cn(
+                             "w-14 h-14 rounded-full flex items-center justify-center transition-all",
+                             !isVideoOn ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-slate-800 text-white hover:bg-slate-700"
+                         )}
+                      >
+                          {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                      </button>
+
+                      <button 
+                         onClick={disconnect}
+                         className="w-14 h-14 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-all shadow-lg shadow-red-900/20"
+                      >
+                          <PhoneOff className="w-6 h-6" />
+                      </button>
+                  </>
+              )}
+          </div>
+          
+          {error && (
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 backdrop-blur-sm z-30">
+                  <AlertCircle className="w-4 h-4" /> {error}
+              </div>
           )}
-          <div ref={transcriptEndRef} />
-        </div>
       </Card>
+      
+      {/* Hidden Canvas for Frame Capture */}
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 };

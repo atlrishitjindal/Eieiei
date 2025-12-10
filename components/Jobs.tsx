@@ -51,10 +51,17 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
   const handleGenerateJobs = async () => {
     if (!resumeAnalysis) return;
     setIsGeneratingJobs(true);
-    setJobs([]);
+    // Don't clear immediately to keep UI stable
     try {
       const tailoredJobs = await generateTailoredJobs(resumeAnalysis.summary, resumeAnalysis.skills || []);
-      setJobs(tailoredJobs);
+      
+      // Merge with Global Jobs (Employer Posted)
+      const globalJobsStr = localStorage.getItem('carrerx_global_jobs');
+      const globalJobs: Job[] = globalJobsStr ? JSON.parse(globalJobsStr) : [];
+      
+      // We prioritize Global jobs, then new tailored AI jobs
+      setJobs([...globalJobs, ...tailoredJobs]);
+      
       onActivity("Job Search", `Found ${tailoredJobs.length} roles`);
     } catch (error) {
       console.error(error);

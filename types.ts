@@ -41,6 +41,12 @@ export interface ResumeAnalysis {
   file?: ResumeFile;
 }
 
+export interface SavedResume {
+  id: string;
+  created_at: string;
+  data: ResumeAnalysis;
+}
+
 export interface InterviewReport {
   overallScore: number;
   technicalScore: number;
@@ -78,6 +84,8 @@ export interface Application {
   jobTitle: string;
   candidateName: string;
   candidateEmail: string;
+  candidatePhone?: string;
+  candidateAddress?: string;
   matchScore: number; // Simulated score
   status: 'New' | 'Reviewed' | 'Interview' | 'Rejected' | 'Shortlisted';
   timestamp: Date;

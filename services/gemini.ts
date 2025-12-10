@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job, SkillSuggestion } from "../types";
+import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job, SkillSuggestion, ChatMessage } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
 const getAiClient = () => {
@@ -370,5 +370,57 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
     return JSON.parse(cleanJson(text)) as SkillSuggestion[];
   } catch (error) {
     return handleGeminiError(error) as any;
+  }
+};
+
+export const sendChatMessage = async (history: ChatMessage[], newMessage: string, currentContext: string): Promise<string> => {
+  const ai = getAiClient();
+  
+  const systemInstruction = `You are CarrerBot, the intelligent assistant for the CarrerX platform. 
+  Your goal is to help users navigate the website and explain its features.
+  
+  WEBSITE KNOWLEDGE BASE (What you know about CarrerX):
+  1. **Dashboard**: The central hub showing an overview of resume score, active applications, and recommended actions.
+  2. **Resume Analyzer**: Allows users to upload a PDF resume. It uses AI to score it (0-100), identify strengths/weaknesses, and suggest specific improvements.
+  3. **Interview Prep (Live Interview)**: A real-time voice-based mock interview simulator. Users speak to an AI hiring manager. Requires a resume upload first.
+  4. **Job Matches**: Lists jobs tailored to the user's skills found in their resume. Users can "Analyze Fit" to see why they match a specific job.
+  5. **Cover Letter Writer**: Generates a tailored cover letter based on the user's resume and a pasted job description.
+  6. **Skill Suggestions**: Recommends skills to learn based on the user's profile and provides search queries for courses.
+  7. **Market Insights**: A research tool to check salaries, trends, and industry news using Google Search grounding.
+  8. **My Applications**: Tracks the status of jobs the user has applied to (New, Shortlisted, Interview, Rejected).
+  
+  ROLES:
+  - **Candidate**: Uses the tools to get hired.
+  - **Employer**: Uses the "Recruiter OS" to post jobs and manage applicants.
+
+  CURRENT CONTEXT: The user is currently viewing the "${currentContext}" page.
+
+  GUIDELINES:
+  - Be helpful, concise, and professional.
+  - If a user asks "How do I...", guide them to the specific tab/feature.
+  - If a user asks about their specific data (e.g. "What is my score?"), explain you can't see their private data directly but guide them to the Resume Analyzer tab.
+  - You are NOT a general LLM; keep the conversation focused on career, jobs, and using this website.
+  `;
+
+  try {
+    const chat = ai.chats.create({
+      model: 'gemini-2.5-flash',
+      config: {
+        systemInstruction: systemInstruction,
+      },
+      history: history.map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.text }]
+      }))
+    });
+
+    const result = await chat.sendMessage({
+        message: newMessage
+    });
+
+    return result.text || "I'm sorry, I didn't catch that.";
+  } catch (error) {
+    console.error("Chat error", error);
+    return "I'm having trouble connecting right now. Please try again.";
   }
 };
