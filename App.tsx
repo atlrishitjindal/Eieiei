@@ -13,6 +13,7 @@ import CoverLetter from './components/CoverLetter';
 import SkillSuggestions from './components/SkillSuggestions';
 import MyApplications from './components/MyApplications';
 import CalendarView from './components/CalendarView';
+import Settings from './components/Settings';
 import { AppView, ResumeAnalysis, ActivityLog, UserRole, Job, Application } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './lib/supabaseClient';
@@ -53,6 +54,11 @@ function App() {
             role: (session.user.user_metadata.role as UserRole) || 'candidate'
         });
         setViewState('app');
+        
+        // Handle password recovery specific flow
+        if (_event === 'PASSWORD_RECOVERY') {
+            setCurrentView(AppView.SETTINGS);
+        }
       } else if (_event === 'SIGNED_OUT') {
         setUser(null);
         setViewState('landing');
@@ -81,6 +87,12 @@ function App() {
     setCurrentView(AppView.DASHBOARD);
     setResumeAnalysis(null);
     setActivities([]);
+  };
+
+  const handleUpdateProfile = (name: string) => {
+    if (user) {
+      setUser({ ...user, name });
+    }
   };
 
   const addActivity = (title: string, meta: string) => {
@@ -292,6 +304,13 @@ function App() {
                 <CalendarView 
                   applications={applications}
                   user={user!}
+                />
+              )}
+
+              {currentView === AppView.SETTINGS && (
+                <Settings 
+                  user={user!} 
+                  onUpdateProfile={handleUpdateProfile} 
                 />
               )}
             </motion.div>

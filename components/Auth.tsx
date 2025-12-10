@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Github, Chrome, Command, Briefcase, User, AlertCircle, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
+import { ArrowRight, Github, Chrome, Command, Briefcase, User, AlertCircle, ArrowLeft, CheckCircle, KeyRound, Mail, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Input, Card } from './ui/DesignSystem';
 import { UserRole } from '../types';
@@ -24,6 +24,21 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleRateLimitError = (error: any) => {
+    const msg = error?.message?.toLowerCase() || '';
+    if (
+      error?.status === 429 || 
+      msg.includes("rate limit") || 
+      msg.includes("sending recovery email") ||
+      msg.includes("too many requests") ||
+      msg.includes("security purposes")
+    ) {
+      return new Error("Service is busy (Rate Limit). Please wait 60 seconds before trying again.");
+    }
+    return error;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,9 +47,11 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
     setMessage(null);
     
     try {
+      const cleanEmail = email.trim();
+      
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: cleanEmail,
           password,
           options: {
             emailRedirectTo: window.location.origin,
@@ -47,14 +64,13 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
           }
         });
 
-        if (error) throw error;
+        if (error) throw handleRateLimitError(error);
         
-        // Show verification message and stop. Do not auto-login to force verification flow.
-        setMessage("Account created! Please verify your email address to complete registration.");
+        setMessage("Account created! Please check your email (and spam folder) to verify your account.");
         
       } else if (mode === 'login') {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password
         });
 
@@ -62,18 +78,23 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
 
         if (data.user) {
           onComplete({
-            name: data.user.user_metadata.full_name || email.split('@')[0],
-            email: data.user.email || email,
+            name: data.user.user_metadata.full_name || cleanEmail.split('@')[0],
+            email: data.user.email || cleanEmail,
             role: (data.user.user_metadata.role as UserRole) || 'candidate'
           });
         }
       } else if (mode === 'forgot_password') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        if (!cleanEmail) throw new Error("Please enter your email address.");
+
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: window.location.origin,
         });
         
-        if (error) throw error;
-        setMessage("Password reset link has been sent to your email.");
+        if (error) {
+          console.error("Reset Password Error:", error);
+          throw handleRateLimitError(error);
+        }
+        setResetSent(true);
       }
     } catch (err: any) {
       setError(err.message || "Authentication failed");
@@ -86,6 +107,9 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
     setMode(mode === 'login' ? 'signup' : 'login');
     setError(null);
     setMessage(null);
+    setResetSent(false);
+    // Clear sensitive fields but keep email if user is just switching modes
+    setPassword('');
   };
 
   const handleSocialLogin = async (provider: 'github' | 'google') => {
@@ -144,134 +168,172 @@ const Auth: React.FC<AuthProps> = ({ onComplete, initialMode = 'login' }) => {
             </div>
           )}
 
-          {/* Role Toggle - Now visible in both login and signup modes */}
-          {(mode === 'login' || mode === 'signup') && (
-            <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
-              <button
-                type="button"
-                onClick={() => setRole('candidate')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-all ${
-                  role === 'candidate' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <User className="w-4 h-4" /> Candidate
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole('employer')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-all ${
-                  role === 'employer' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Briefcase className="w-4 h-4" /> Employer
-              </button>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Full Name</label>
-                  <Input 
-                    type="text" 
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="John Doe"
-                    className="bg-slate-50 border-slate-300"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Phone Number</label>
-                  <Input 
-                    type="tel" 
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (555) 123-4567"
-                    className="bg-slate-50 border-slate-300"
-                  />
-                </div>
-              </>
-            )}
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                {role === 'employer' && mode !== 'forgot_password' ? 'Work Email' : 'Email Address'}
-              </label>
-              <Input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={role === 'employer' && mode !== 'forgot_password' ? "recruiter@company.com" : "name@example.com"}
-                className="bg-slate-50 border-slate-300"
-              />
-            </div>
-
-            {mode === 'signup' && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Address</label>
-                <Input 
-                  type="text" 
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="123 Main St, City, Country"
-                  className="bg-slate-50 border-slate-300"
-                />
+          {resetSent && mode === 'forgot_password' ? (
+            <div className="text-center space-y-6">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <Mail className="w-8 h-8" />
               </div>
-            )}
-
-            {(mode === 'login' || mode === 'signup') && (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Password</label>
-                  {mode === 'login' && (
-                    <button 
-                      type="button" 
-                      onClick={() => { setMode('forgot_password'); setError(null); setMessage(null); }}
-                      className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Check your inbox</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  We've sent a password reset link to <strong>{email}</strong>.
+                </p>
+                <div className="mt-6 bg-slate-50 p-4 rounded-lg text-left text-xs text-slate-500 space-y-3">
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold border-b border-slate-200 pb-2">
+                    <Info className="w-4 h-4" /> Troubleshooting
+                  </div>
+                  <ul className="list-disc pl-4 space-y-2">
+                    <li>Check your <strong>Spam</strong> or Junk folder.</li>
+                    <li>
+                      The link redirects to: <br/>
+                      <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-700 font-mono mt-1 inline-block break-all">{window.location.origin}</code>
+                    </li>
+                    <li className="text-amber-600 font-medium">
+                      If you see <strong>"Connection Refused"</strong>, ensure the URL above is added to your Supabase Redirect URLs.
+                    </li>
+                  </ul>
                 </div>
-                <Input 
-                  type="password" 
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-slate-50 border-slate-300"
-                />
               </div>
-            )}
-
-            <Button 
-              type="submit"
-              variant={role === 'employer' ? 'primary' : 'primary'} 
-              className={`w-full ${role === 'employer' && mode !== 'forgot_password' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20' : ''}`}
-              isLoading={loading}
-            >
-              {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'} 
-              {mode !== 'forgot_password' && <ArrowRight className="w-4 h-4 ml-2" />}
-              {mode === 'forgot_password' && <KeyRound className="w-4 h-4 ml-2" />}
-            </Button>
-            
-            {mode === 'forgot_password' && (
               <Button 
-                type="button"
-                variant="ghost"
-                className="w-full mt-2"
-                onClick={() => { setMode('login'); setError(null); setMessage(null); }}
+                variant="outline" 
+                className="w-full"
+                onClick={() => { setMode('login'); setResetSent(false); }}
               >
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Login
+                Back to Log In
               </Button>
-            )}
-          </form>
+            </div>
+          ) : (
+            <>
+              {/* Role Toggle - Now visible in both login and signup modes */}
+              {(mode === 'login' || mode === 'signup') && (
+                <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setRole('candidate')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-all ${
+                      role === 'candidate' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <User className="w-4 h-4" /> Candidate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('employer')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-all ${
+                      role === 'employer' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Briefcase className="w-4 h-4" /> Employer
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {mode === 'signup' && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Full Name</label>
+                      <Input 
+                        type="text" 
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="John Doe"
+                        className="bg-slate-50 border-slate-300"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Phone Number</label>
+                      <Input 
+                        type="tel" 
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+1 (555) 123-4567"
+                        className="bg-slate-50 border-slate-300"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    {role === 'employer' && mode !== 'forgot_password' ? 'Work Email' : 'Email Address'}
+                  </label>
+                  <Input 
+                    type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={role === 'employer' && mode !== 'forgot_password' ? "recruiter@company.com" : "name@example.com"}
+                    className="bg-slate-50 border-slate-300"
+                  />
+                </div>
+
+                {mode === 'signup' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Address</label>
+                    <Input 
+                      type="text" 
+                      required
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="123 Main St, City, Country"
+                      className="bg-slate-50 border-slate-300"
+                    />
+                  </div>
+                )}
+
+                {(mode === 'login' || mode === 'signup') && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Password</label>
+                      {mode === 'login' && (
+                        <button 
+                          type="button" 
+                          onClick={() => { setMode('forgot_password'); setError(null); setMessage(null); setResetSent(false); }}
+                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
+                    <Input 
+                      type="password" 
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bg-slate-50 border-slate-300"
+                    />
+                  </div>
+                )}
+
+                <Button 
+                  type="submit"
+                  variant={role === 'employer' ? 'primary' : 'primary'} 
+                  className={`w-full ${role === 'employer' && mode !== 'forgot_password' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20' : ''}`}
+                  isLoading={loading}
+                >
+                  {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'} 
+                  {mode !== 'forgot_password' && <ArrowRight className="w-4 h-4 ml-2" />}
+                  {mode === 'forgot_password' && <KeyRound className="w-4 h-4 ml-2" />}
+                </Button>
+                
+                {mode === 'forgot_password' && (
+                  <Button 
+                    type="button"
+                    variant="ghost"
+                    className="w-full mt-2"
+                    onClick={() => { setMode('login'); setError(null); setMessage(null); setResetSent(false); }}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Login
+                  </Button>
+                )}
+              </form>
+            </>
+          )}
 
           {(mode === 'login' || mode === 'signup') && (
             <div className="mt-8">

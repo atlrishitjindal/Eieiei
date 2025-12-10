@@ -78,6 +78,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
                   <NavItem view={AppView.CALENDAR} icon={Calendar} label="Calendar" />
                 </div>
               </div>
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Account</div>
+                <div className="space-y-1">
+                  <NavItem view={AppView.SETTINGS} icon={Settings} label="Settings" />
+                </div>
+              </div>
             </>
           ) : (
             // CANDIDATE NAVIGATION
@@ -100,6 +106,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
                   <NavItem view={AppView.INTERVIEW} icon={Mic} label="Interview Prep" />
                   <NavItem view={AppView.INSIGHTS} icon={TrendingUp} label="Market Data" />
                   <NavItem view={AppView.CALENDAR} icon={Calendar} label="Calendar" />
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-4">Account</div>
+                <div className="space-y-1">
+                  <NavItem view={AppView.SETTINGS} icon={Settings} label="Settings" />
                 </div>
               </div>
             </>

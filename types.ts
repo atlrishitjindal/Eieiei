@@ -11,7 +11,8 @@ export enum AppView {
   APPLICANTS = 'APPLICANTS',
   SHORTLISTED = 'SHORTLISTED',
   MY_APPLICATIONS = 'MY_APPLICATIONS',
-  CALENDAR = 'CALENDAR'
+  CALENDAR = 'CALENDAR',
+  SETTINGS = 'SETTINGS'
 }
 
 export type UserRole = 'candidate' | 'employer';
