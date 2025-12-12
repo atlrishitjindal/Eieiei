@@ -6,7 +6,7 @@ const getAiClient = () => {
   if (!apiKey) {
     throw new Error("API Key not found. If you are on Vercel, please add 'API_KEY' to your project's Environment Variables.");
   }
-  return new GoogleGenAI({ apiKey: apiKey });
+  return new GoogleGenerativeAI({ apiKey: apiKey });
 };
 
 const handleGeminiError = async (error: any): Promise<never> => {
