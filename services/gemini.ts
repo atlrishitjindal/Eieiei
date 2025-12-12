@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, Type, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType, Schema } from "@google/generative-ai";
 import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job, SkillSuggestion, ChatMessage } from "../types";
 
 const getAiClient = () => {
