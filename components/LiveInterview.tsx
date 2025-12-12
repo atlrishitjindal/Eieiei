@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff } from 'lucide-react';
-import { GoogleGenerativeAI, LiveServerMessage, Modality } from '@google/generative-ai';
+import { GoogleGenerativeAI, LiveServerMessage } from '@google/generative-ai';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
 import { cn } from '../lib/utils';
@@ -116,7 +116,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-            responseModalities: [Modality.AUDIO],
+            responseModalities: ["audio"],
             systemInstruction: `You are an experienced hiring manager conducting a job interview. 
             The candidate's summary is: "${resumeAnalysis.summary}". 
             Their key strengths are: ${resumeAnalysis.strengths.join(', ')}.
