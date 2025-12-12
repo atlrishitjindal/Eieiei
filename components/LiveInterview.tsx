@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage } from '@google/genai';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
 import { cn } from '../lib/utils';
@@ -122,7 +122,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-            responseModalities: [Modality.AUDIO],
+            responseModalities: ['AUDIO' as any], // Use string literal cast to any to avoid type issues
             systemInstruction: `You are an experienced hiring manager conducting a job interview. 
             The candidate's summary is: "${resumeAnalysis.summary}". 
             Their key strengths are: ${resumeAnalysis.strengths.join(', ')}.
