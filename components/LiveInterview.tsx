@@ -1,250 +1,54 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage } from '@google/genai';
+import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff, Play } from 'lucide-react';
+import { generateInterviewResponse } from '../services/gemini';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
 import { cn } from '../lib/utils';
-import { createPcmBlob, decodeAudioData, base64ToBytes } from '../services/audioUtils';
 
 interface LiveInterviewProps {
   resumeAnalysis: ResumeAnalysis | null;
 }
 
 const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [volume, setVolume] = useState(0);
-
-  // Refs for audio context and processing
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const videoStreamRef = useRef<MediaStream | null>(null);
+  const [transcript, setTranscript] = useState<{role: 'user'|'ai', text: string}[]>([]);
+  
+  // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
-  const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const nextStartTimeRef = useRef<number>(0);
-  const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  
-  // Canvas ref for video frame capture
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const frameIntervalRef = useRef<number | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  const stopAudio = () => {
-     if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopVideo();
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const startSession = () => {
+     if (!resumeAnalysis) {
+         setError("Resume required to start.");
+         return;
      }
-     if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-     }
-     if (processorRef.current) {
-        processorRef.current.disconnect();
-        processorRef.current = null;
-     }
-     if (inputSourceRef.current) {
-        inputSourceRef.current.disconnect();
-        inputSourceRef.current = null;
-     }
-     // Stop all playing sources
-     audioSourcesRef.current.forEach(source => {
-        try { source.stop(); } catch (e) {}
-     });
-     audioSourcesRef.current.clear();
-  };
-  
-  const stopVideo = () => {
-    if (frameIntervalRef.current) {
-        clearInterval(frameIntervalRef.current);
-        frameIntervalRef.current = null;
-    }
-    if (videoStreamRef.current) {
-        videoStreamRef.current.getTracks().forEach(track => track.stop());
-        videoStreamRef.current = null;
-    }
-    setIsVideoOn(false);
+     setIsActive(true);
+     setTranscript([]);
+     speak("Hello! I've reviewed your resume. Are you ready to begin the interview?");
   };
 
-  const disconnect = async () => {
-     if (sessionPromiseRef.current) {
-         try {
-             const session = await sessionPromiseRef.current;
-             session.close();
-         } catch (e) {
-             console.error("Error closing session", e);
-         }
-         sessionPromiseRef.current = null;
-     }
-     stopAudio();
+  const endSession = () => {
+     setIsActive(false);
      stopVideo();
-     setIsConnected(false);
-     setIsConnecting(false);
+     if (window.speechSynthesis) window.speechSynthesis.cancel();
+     setTranscript([]);
   };
 
-  const connect = async () => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        setError("API Key is missing. Please add API_KEY to your environment variables (e.g. Vercel dashboard).");
-        return;
-    }
-
-    if (!resumeAnalysis) {
-        setError("Please upload a resume first to start the interview simulation.");
-        return;
-    }
-    
-    setIsConnecting(true);
-    setError(null);
-
-    try {
-      // Initialize client inside the action to be safe
-      const ai = new GoogleGenAI({ apiKey });
-
-      // 1. Setup Audio Contexts
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      nextStartTimeRef.current = audioContextRef.current.currentTime;
-      
-      // 2. Get Microphone Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          autoGainControl: true,
-          noiseSuppression: true
-      } });
-      streamRef.current = stream;
-
-      // 3. Connect to Gemini Live
-      const sessionPromise = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-        config: {
-            responseModalities: ['AUDIO' as any], // Use string literal cast to any to avoid type issues
-            systemInstruction: `You are an experienced hiring manager conducting a job interview. 
-            The candidate's summary is: "${resumeAnalysis.summary}". 
-            Their key strengths are: ${resumeAnalysis.strengths.join(', ')}.
-            
-            Your goal is to assess their fit for a Senior role similar to their experience.
-            Start by welcoming them and asking a relevant opening question based on their resume.
-            Keep your responses concise and conversational. Do not be too verbose.
-            If the candidate struggles, offer a small hint or move to a different topic.
-            Be professional but encouraging.`,
-            speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
-            }
-        },
-        callbacks: {
-            onopen: async () => {
-                console.log("Gemini Live Session Opened");
-                setIsConnected(true);
-                setIsConnecting(false);
-                
-                // Start Audio Processing Pipeline
-                if (!audioContextRef.current || !streamRef.current) return;
-                
-                // Use a separate input context for 16kHz capture if needed
-                const inputContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-                const source = inputContext.createMediaStreamSource(streamRef.current);
-                inputSourceRef.current = source;
-                
-                const processor = inputContext.createScriptProcessor(4096, 1, 1);
-                processorRef.current = processor;
-                
-                processor.onaudioprocess = (e) => {
-                    if (isMuted) return; // Don't send data if muted
-                    
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    
-                    // Simple volume meter
-                    let sum = 0;
-                    for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
-                    setVolume(Math.sqrt(sum / inputData.length));
-
-                    const pcmBlob = createPcmBlob(inputData);
-                    
-                    // We must use the promise stored in ref because session isn't available in closure yet when defined
-                    if (sessionPromiseRef.current) {
-                        sessionPromiseRef.current.then(session => {
-                            try {
-                                session.sendRealtimeInput({ media: pcmBlob });
-                            } catch (err) {
-                                console.error("Error sending audio input", err);
-                            }
-                        });
-                    }
-                };
-                
-                source.connect(processor);
-                processor.connect(inputContext.destination);
-            },
-            onmessage: async (message: LiveServerMessage) => {
-                const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-                
-                if (base64Audio && audioContextRef.current) {
-                    try {
-                        const audioBytes = base64ToBytes(base64Audio);
-                        const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
-                        
-                        const source = audioContextRef.current.createBufferSource();
-                        source.buffer = audioBuffer;
-                        source.connect(audioContextRef.current.destination);
-                        
-                        // Schedule playback
-                        const currentTime = audioContextRef.current.currentTime;
-                        if (nextStartTimeRef.current < currentTime) {
-                            nextStartTimeRef.current = currentTime;
-                        }
-                        
-                        source.start(nextStartTimeRef.current);
-                        nextStartTimeRef.current += audioBuffer.duration;
-                        
-                        audioSourcesRef.current.add(source);
-                        source.onended = () => {
-                            audioSourcesRef.current.delete(source);
-                        };
-                    } catch (e) {
-                        console.error("Error processing audio message", e);
-                    }
-                }
-                
-                const interrupted = message.serverContent?.interrupted;
-                if (interrupted) {
-                    audioSourcesRef.current.forEach(s => s.stop());
-                    audioSourcesRef.current.clear();
-                    if (audioContextRef.current) {
-                        nextStartTimeRef.current = audioContextRef.current.currentTime;
-                    }
-                }
-            },
-            onclose: () => {
-                console.log("Gemini Live Session Closed");
-                disconnect();
-            },
-            onerror: (err) => {
-                console.error("Gemini Live Session Error", err);
-                setError("Connection lost. Please try again.");
-                disconnect();
-            }
-        }
-      });
-      
-      sessionPromiseRef.current = sessionPromise;
-
-    } catch (err: any) {
-        console.error("Failed to connect", err);
-        setError(err.message || "Failed to start interview session.");
-        setIsConnecting(false);
-        disconnect();
-    }
-  };
-
-  const toggleMute = () => {
-      setIsMuted(!isMuted);
-  };
-  
   const toggleVideo = async () => {
       if (isVideoOn) {
           stopVideo();
@@ -256,54 +60,130 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                   videoRef.current.srcObject = stream;
               }
               setIsVideoOn(true);
-              
-              // Start frame capture
-              startVideoStreaming();
           } catch (e) {
               console.error("Failed to access camera", e);
+              setError("Could not access camera.");
           }
       }
   };
-  
-  const startVideoStreaming = () => {
-      if (!canvasRef.current || !videoRef.current) return;
-      
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const video = videoRef.current;
-      
-      frameIntervalRef.current = window.setInterval(async () => {
-          if (!ctx || !video.videoWidth) return;
-          
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          
-          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-          
-          if (sessionPromiseRef.current) {
-              sessionPromiseRef.current.then(session => {
-                 try {
-                     session.sendRealtimeInput({
-                         media: {
-                             mimeType: 'image/jpeg',
-                             data: base64Data
-                         }
-                     });
-                 } catch(e) {
-                     // ignore send errors
-                 }
-              });
-          }
-      }, 1000);
+
+  const stopVideo = () => {
+    if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach(track => track.stop());
+        videoStreamRef.current = null;
+    }
+    setIsVideoOn(false);
   };
 
-  // Cleanup on unmount
-  useEffect(() => {
-      return () => {
-          disconnect();
+  const speak = (text: string) => {
+    if (!window.speechSynthesis) return;
+    
+    // Cancel current speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Try to find a good voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
+    if (preferredVoice) utterance.voice = preferredVoice;
+    
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+    
+    setTranscript(prev => [...prev, { role: 'ai', text }]);
+  };
+
+  const toggleRecording = async () => {
+     if (isRecording) {
+         stopRecording();
+     } else {
+         startRecording();
+     }
+  };
+
+  const startRecording = async () => {
+     try {
+         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+         const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+         
+         mediaRecorderRef.current = recorder;
+         audioChunksRef.current = [];
+         
+         recorder.ondataavailable = (event) => {
+             if (event.data.size > 0) {
+                 audioChunksRef.current.push(event.data);
+             }
+         };
+         
+         recorder.onstop = processAudio;
+         
+         recorder.start();
+         setIsRecording(true);
+         
+         // Cancel AI speech if user interrupts
+         if (window.speechSynthesis) window.speechSynthesis.cancel();
+         setIsSpeaking(false);
+         
+     } catch (e) {
+         console.error("Mic error", e);
+         setError("Could not access microphone.");
+     }
+  };
+
+  const stopRecording = () => {
+     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+         mediaRecorderRef.current.stop();
+         setIsRecording(false);
+         
+         // Stop tracks
+         mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+     }
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        // Remove data url prefix (e.g. "data:audio/webm;base64,")
+        const base64 = base64String.split(',')[1];
+        resolve(base64);
       };
-  }, []);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const processAudio = async () => {
+      setIsProcessing(true);
+      try {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const base64Audio = await blobToBase64(audioBlob);
+          
+          setTranscript(prev => [...prev, { role: 'user', text: '(Audio Response)' }]);
+
+          // Send to Gemini
+          const context = `${resumeAnalysis?.summary}. Strengths: ${resumeAnalysis?.strengths.join(', ')}`;
+          
+          // Note: In a real turn-based system we'd send history, but generateContent with audio 
+          // works best as a single prompt in the JS SDK unless using the ChatSession with multimodal history (advanced).
+          // For this demo, we use a single turn response.
+          const responseText = await generateInterviewResponse(base64Audio, context, []);
+          
+          speak(responseText);
+          
+      } catch (e: any) {
+          console.error("Processing error", e);
+          setError(e.message || "Failed to process audio.");
+      } finally {
+          setIsProcessing(false);
+      }
+  };
 
   if (!resumeAnalysis) {
       return (
@@ -312,7 +192,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
              <Mic className="w-8 h-8 text-slate-400" />
           </div>
           <h3 className="text-xl font-bold text-slate-900 mb-2">Resume Required</h3>
-          <p className="text-slate-500 max-w-md">Please upload your resume first so the AI interviewer can ask relevant questions.</p>
+          <p className="text-slate-500 max-w-md">Please upload your resume first to start the interview simulation.</p>
         </Card>
       );
   }
@@ -321,12 +201,12 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
     <div className="flex flex-col h-full max-h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between mb-6">
          <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight font-display">Live Interview Sim</h1>
-            <p className="text-slate-500 mt-2">Real-time voice practice with an AI hiring manager.</p>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight font-display">Interview Sim</h1>
+            <p className="text-slate-500 mt-2">Practice answering questions with an AI hiring manager.</p>
          </div>
-         {isConnected && (
-             <Badge variant="error" className="animate-pulse bg-red-50 text-red-600 border-red-200">
-                <div className="w-2 h-2 rounded-full bg-red-600 mr-2" /> Live
+         {isActive && (
+             <Badge variant="success" className="bg-emerald-50 text-emerald-600 border-emerald-200">
+                <div className="w-2 h-2 rounded-full bg-emerald-600 mr-2 animate-pulse" /> Active
              </Badge>
          )}
       </div>
@@ -340,11 +220,10 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
              <div className="relative z-10 flex flex-col items-center gap-6">
                 <div className={cn(
                     "w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 relative",
-                    isConnected ? "bg-purple-600 shadow-[0_0_40px_-10px_rgba(147,51,234,0.5)] scale-110" : "bg-slate-700"
+                    isSpeaking ? "bg-purple-600 shadow-[0_0_40px_-10px_rgba(147,51,234,0.5)] scale-110" : "bg-slate-700"
                 )}>
-                    {isConnected ? (
+                    {isSpeaking ? (
                         <>
-                           {/* Simple visualizer ring */}
                            <div className="absolute inset-0 rounded-full border-2 border-purple-400 opacity-50 animate-ping" style={{ animationDuration: '2s' }} />
                            <Volume2 className="w-12 h-12 text-white" />
                         </>
@@ -353,13 +232,15 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                     )}
                 </div>
                 
-                <div className="text-center space-y-2">
+                <div className="text-center space-y-2 px-4">
                     <h3 className="text-2xl font-bold text-white">AI Interviewer</h3>
-                    <p className="text-slate-400 max-w-md">
-                        {isConnected 
-                          ? "Listening..." 
-                          : "Ready to start. Ensure your microphone is enabled."}
-                    </p>
+                    {transcript.length > 0 && (
+                        <div className="max-w-md mx-auto h-16 flex items-center justify-center">
+                           <p className="text-slate-300 text-sm italic line-clamp-2">
+                              "{transcript[transcript.length - 1].text}"
+                           </p>
+                        </div>
+                    )}
                 </div>
              </div>
              
@@ -373,50 +254,61 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                      </div>
                  )}
                  <div className="absolute bottom-2 left-2 flex gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-50")} />
+                      <div className={cn("w-2 h-2 rounded-full", isActive ? "bg-green-500" : "bg-red-50")} />
                  </div>
              </div>
           </div>
 
           {/* Controls Bar */}
           <div className="p-6 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-6 relative z-20">
-              {!isConnected ? (
+              {!isActive ? (
                   <Button 
                     size="xl" 
-                    onClick={connect} 
-                    disabled={isConnecting}
+                    onClick={startSession} 
                     className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20 rounded-full px-8"
                   >
-                    {isConnecting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Mic className="w-5 h-5 mr-2" />}
-                    Start Interview
+                    <Play className="w-5 h-5 mr-2" /> Start Interview
                   </Button>
               ) : (
                   <>
+                      {/* Record Button */}
                       <button 
-                         onClick={toggleMute}
+                         onClick={toggleRecording}
+                         disabled={isProcessing || isSpeaking}
                          className={cn(
-                             "w-14 h-14 rounded-full flex items-center justify-center transition-all",
-                             isMuted ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-slate-800 text-white hover:bg-slate-700"
+                             "w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-xl border-4",
+                             isRecording 
+                                ? "bg-red-600 border-red-800 animate-pulse scale-110" 
+                                : isProcessing 
+                                   ? "bg-slate-700 border-slate-600 cursor-wait"
+                                   : "bg-white text-slate-900 border-slate-200 hover:bg-slate-100"
                          )}
                       >
-                          {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                          {isProcessing ? (
+                              <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                          ) : isRecording ? (
+                              <div className="w-8 h-8 bg-white rounded-md" /> // Stop icon
+                          ) : (
+                              <Mic className="w-8 h-8" />
+                          )}
                       </button>
                       
                       <button 
                          onClick={toggleVideo}
                          className={cn(
-                             "w-14 h-14 rounded-full flex items-center justify-center transition-all",
-                             !isVideoOn ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-slate-800 text-white hover:bg-slate-700"
+                             "absolute right-24 w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                             !isVideoOn ? "bg-slate-800 text-slate-400 hover:bg-slate-700" : "bg-slate-800 text-white hover:bg-slate-700"
                          )}
                       >
-                          {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                          {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                       </button>
 
                       <button 
-                         onClick={disconnect}
-                         className="w-14 h-14 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-all shadow-lg shadow-red-900/20"
+                         onClick={endSession}
+                         className="absolute right-6 w-12 h-12 rounded-full bg-red-900/50 text-red-500 flex items-center justify-center hover:bg-red-900/80 transition-all"
+                         title="End Interview"
                       >
-                          <PhoneOff className="w-6 h-6" />
+                          <PhoneOff className="w-5 h-5" />
                       </button>
                   </>
               )}
@@ -429,8 +321,11 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
           )}
       </Card>
       
-      {/* Hidden Canvas for Frame Capture */}
-      <canvas ref={canvasRef} className="hidden" />
+      {isActive && (
+          <div className="mt-4 text-center text-slate-500 text-sm">
+             {isRecording ? "Listening... click to stop." : isProcessing ? "Thinking..." : isSpeaking ? "Interviewer speaking..." : "Click microphone to answer."}
+          </div>
+      )}
     </div>
   );
 };
