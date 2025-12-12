@@ -14,22 +14,16 @@ const handleGeminiError = async (error: any): Promise<never> => {
   
   let errorMessage = error.message || "Unknown error occurred";
 
-  // Handle API Key issues (403, leaked key, or entity not found which often means project/key issue)
-  if (
-    errorMessage.toLowerCase().includes("leaked") || 
-    errorMessage.includes("403") || 
-    errorMessage.includes("permission_denied") ||
-    errorMessage.includes("Requested entity was not found") 
-  ) {
+  if (errorMessage.toLowerCase().includes("leaked") || errorMessage.includes("403") || errorMessage.includes("permission_denied")) {
      if (typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
         try {
             await (window as any).aistudio.openSelectKey();
-            throw new Error("API Key issue detected. We've opened the key selector. Please select a valid paid key and try again.");
+            throw new Error("API Key issue. Opening selection dialog...");
         } catch (e) {
             console.error("Failed to open key selector", e);
         }
      }
-     throw new Error("Your API key was rejected. Please check your quota or refresh the page.");
+     throw new Error("Your API key was rejected (403). Please check your quota or refresh the page.");
   }
   
   if (errorMessage.includes("404") || errorMessage.includes("not found")) {
@@ -66,8 +60,8 @@ export const analyzeResume = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: {
         parts: [
           { inlineData: { data: data, mimeType: normalizedMimeType } },
@@ -91,7 +85,7 @@ export const analyzeResume = async (
       }
     });
 
-    const text = response.text;
+    const text = result.text;
     if (!text) throw new Error("No response received from AI model.");
     
     return JSON.parse(cleanJson(text)) as ResumeAnalysis;
@@ -106,11 +100,11 @@ export const generateImprovementExample = async (improvement: string, resumeSumm
   Task: Write a specific, concrete example (1-2 sentences) of how to implement this improvement.`;
   
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: prompt
     });
-    return response.text || "Could not generate example.";
+    return result.text || "Could not generate example.";
   } catch (error) {
     return handleGeminiError(error) as any;
   }
@@ -123,8 +117,8 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
   Provide JSON assessment: overallScore (0-100), technicalScore, communicationScore, strengths, improvements.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -142,7 +136,7 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
       }
     });
 
-    const text = response.text;
+    const text = result.text;
     if (!text) throw new Error("No report generated");
     return JSON.parse(cleanJson(text)) as InterviewReport;
   } catch (error) {
@@ -152,18 +146,22 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
 
 export const getMarketInsights = async (query: string): Promise<InsightResult> => {
   const ai = getAiClient();
+  
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: query,
       config: {
         tools: [{ googleSearch: {} }]
       }
     });
 
-    const text = response.text || "No insights found.";
+    const text = result.text || "No insights found.";
     
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    // Access grounding metadata safely
+    // In @google/genai, it is result.candidates[0].groundingMetadata
+    const groundingMetadata = result.candidates?.[0]?.groundingMetadata;
+    const chunks = groundingMetadata?.groundingChunks || [];
     
     const sources = chunks
       .filter((c: any) => c.web?.uri && c.web?.title)
@@ -195,8 +193,8 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
   Return valid JSON.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -221,7 +219,7 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
       }
     });
 
-    const text = response.text;
+    const text = result.text;
     if (!text) return [];
     return JSON.parse(cleanJson(text)) as Job[];
   } catch (error) {
@@ -244,8 +242,8 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
   Evaluate fit. Provide JSON response.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -263,7 +261,7 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
       }
     });
 
-    const text = response.text;
+    const text = result.text;
     if (!text) throw new Error("No response");
     return JSON.parse(cleanJson(text)) as JobMatchResult;
   } catch (error) {
@@ -273,7 +271,6 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
 
 export const generateCoverLetter = async (resumeSummary: string, jobDescription: string): Promise<string> => {
   const ai = getAiClient();
-  
   const prompt = `Write a professional, persuasive cover letter.
   
   Candidate Summary: ${resumeSummary}
@@ -283,11 +280,11 @@ export const generateCoverLetter = async (resumeSummary: string, jobDescription:
   Return ONLY the cover letter text, no markdown.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: prompt
     });
-    return response.text || "Failed to generate cover letter.";
+    return result.text || "Failed to generate cover letter.";
   } catch (error) {
     return handleGeminiError(error) as any;
   }
@@ -303,8 +300,8 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -325,7 +322,7 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
       }
     });
 
-    const text = response.text;
+    const text = result.text;
     if (!text) return [];
     return JSON.parse(cleanJson(text)) as SkillSuggestion[];
   } catch (error) {
@@ -358,7 +355,7 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
 
   try {
     const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash-exp',
       config: {
         systemInstruction: systemInstruction
       },
@@ -379,30 +376,28 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
 export const generateInterviewResponse = async (audioBase64: string, resumeContext: string, history: {role: string, text: string}[]): Promise<string> => {
   const ai = getAiClient();
   
-  const systemInstruction = `You are an experienced hiring manager conducting a job interview.
-    Context from resume: ${resumeContext}
-    
-    Goal: Assess their fit for a Senior role.
-    Keep your responses concise and conversational (spoken word style). Do not be too verbose.
-    If the candidate struggles, offer a small hint. Be professional but encouraging.
-    `;
-
   try {
-     const response = await ai.models.generateContent({
-       model: 'gemini-2.5-flash',
+     const result = await ai.models.generateContent({
+       model: 'gemini-2.0-flash-exp',
        contents: {
          parts: [
-           { inlineData: { data: audioBase64, mimeType: "audio/webm" } },
-           { text: "Please respond to the candidate's answer naturally." }
+            { inlineData: { data: audioBase64, mimeType: "audio/webm" } },
+            { text: "Please respond to the candidate's answer naturally." }
          ]
        },
        config: {
-         systemInstruction: systemInstruction
+        systemInstruction: `You are an experienced hiring manager conducting a job interview.
+        Context from resume: ${resumeContext}
+        
+        Goal: Assess their fit for a Senior role.
+        Keep your responses concise and conversational (spoken word style). Do not be too verbose.
+        If the candidate struggles, offer a small hint. Be professional but encouraging.
+        `
        }
      });
-     return response.text || "I couldn't process your audio.";
+     return result.text || "";
   } catch (e) {
      console.error("Interview Error", e);
      throw e;
   }
-};
+}
