@@ -6,7 +6,7 @@ const getAiClient = () => {
   if (!apiKey) {
     throw new Error("API Key not found. If you are on Vercel, please add 'API_KEY' to your project's Environment Variables.");
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: apiKey });
 };
 
 const handleGeminiError = async (error: any): Promise<never> => {
@@ -60,8 +60,8 @@ export const analyzeResume = async (
   `;
 
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: {
         parts: [
           { inlineData: { data: data, mimeType: normalizedMimeType } },
@@ -85,7 +85,7 @@ export const analyzeResume = async (
       }
     });
 
-    const text = result.text;
+    const text = response.text;
     if (!text) throw new Error("No response received from AI model.");
     
     return JSON.parse(cleanJson(text)) as ResumeAnalysis;
@@ -100,11 +100,11 @@ export const generateImprovementExample = async (improvement: string, resumeSumm
   Task: Write a specific, concrete example (1-2 sentences) of how to implement this improvement.`;
   
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt
     });
-    return result.text || "Could not generate example.";
+    return response.text || "Could not generate example.";
   } catch (error) {
     return handleGeminiError(error) as any;
   }
@@ -117,8 +117,8 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
   Provide JSON assessment: overallScore (0-100), technicalScore, communicationScore, strengths, improvements.`;
 
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -136,7 +136,7 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
       }
     });
 
-    const text = result.text;
+    const text = response.text;
     if (!text) throw new Error("No report generated");
     return JSON.parse(cleanJson(text)) as InterviewReport;
   } catch (error) {
@@ -146,21 +146,20 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
 
 export const getMarketInsights = async (query: string): Promise<InsightResult> => {
   const ai = getAiClient();
-  
+
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: query,
       config: {
         tools: [{ googleSearch: {} }]
       }
     });
-
-    const text = result.text || "No insights found.";
+    
+    const text = response.text || "No insights found.";
     
     // Access grounding metadata safely
-    // In @google/genai, it is result.candidates[0].groundingMetadata
-    const groundingMetadata = result.candidates?.[0]?.groundingMetadata;
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
     const chunks = groundingMetadata?.groundingChunks || [];
     
     const sources = chunks
@@ -193,8 +192,8 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
   Return valid JSON.`;
 
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -219,7 +218,7 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
       }
     });
 
-    const text = result.text;
+    const text = response.text;
     if (!text) return [];
     return JSON.parse(cleanJson(text)) as Job[];
   } catch (error) {
@@ -242,8 +241,8 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
   Evaluate fit. Provide JSON response.`;
 
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -261,7 +260,7 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
       }
     });
 
-    const text = result.text;
+    const text = response.text;
     if (!text) throw new Error("No response");
     return JSON.parse(cleanJson(text)) as JobMatchResult;
   } catch (error) {
@@ -271,6 +270,7 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
 
 export const generateCoverLetter = async (resumeSummary: string, jobDescription: string): Promise<string> => {
   const ai = getAiClient();
+  
   const prompt = `Write a professional, persuasive cover letter.
   
   Candidate Summary: ${resumeSummary}
@@ -280,11 +280,11 @@ export const generateCoverLetter = async (resumeSummary: string, jobDescription:
   Return ONLY the cover letter text, no markdown.`;
 
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt
     });
-    return result.text || "Failed to generate cover letter.";
+    return response.text || "Failed to generate cover letter.";
   } catch (error) {
     return handleGeminiError(error) as any;
   }
@@ -300,8 +300,8 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
   `;
 
   try {
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -322,7 +322,7 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
       }
     });
 
-    const text = result.text;
+    const text = response.text;
     if (!text) return [];
     return JSON.parse(cleanJson(text)) as SkillSuggestion[];
   } catch (error) {
@@ -354,8 +354,8 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
   `;
 
   try {
-    const chat = ai.chats.create({
-      model: 'gemini-2.0-flash-exp',
+    const chat = ai.chats.create({ 
+      model: 'gemini-2.5-flash',
       config: {
         systemInstruction: systemInstruction
       },
@@ -377,25 +377,25 @@ export const generateInterviewResponse = async (audioBase64: string, resumeConte
   const ai = getAiClient();
   
   try {
-     const result = await ai.models.generateContent({
-       model: 'gemini-2.0-flash-exp',
+     const response = await ai.models.generateContent({
+       model: 'gemini-2.5-flash',
+       config: {
+         systemInstruction: `You are an experienced hiring manager conducting a job interview.
+         Context from resume: ${resumeContext}
+         
+         Goal: Assess their fit for a Senior role.
+         Keep your responses concise and conversational (spoken word style). Do not be too verbose.
+         If the candidate struggles, offer a small hint. Be professional but encouraging.
+         `
+       },
        contents: {
          parts: [
-            { inlineData: { data: audioBase64, mimeType: "audio/webm" } },
-            { text: "Please respond to the candidate's answer naturally." }
+           { inlineData: { data: audioBase64, mimeType: "audio/webm" } },
+           { text: "Please respond to the candidate's answer naturally." }
          ]
-       },
-       config: {
-        systemInstruction: `You are an experienced hiring manager conducting a job interview.
-        Context from resume: ${resumeContext}
-        
-        Goal: Assess their fit for a Senior role.
-        Keep your responses concise and conversational (spoken word style). Do not be too verbose.
-        If the candidate struggles, offer a small hint. Be professional but encouraging.
-        `
        }
      });
-     return result.text || "";
+     return response.text || "";
   } catch (e) {
      console.error("Interview Error", e);
      throw e;
