@@ -36,6 +36,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
       setFile(selectedFile);
       setExamples({});
       setActiveExampleIndex(null);
+      setError(null);
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -69,7 +70,7 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
       onActivity("Resume Analysis", `Scored ${analysis.score}/100`);
     } catch (err: any) {
       console.error(err);
-      setError("Failed to analyze resume. Please ensure it's a clear file.");
+      setError(err.message || "Failed to analyze resume. Please ensure it's a clear file.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -223,7 +224,12 @@ const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
               </div>
             )}
             
-            {error && <p className="mt-4 text-red-400 font-medium">{error}</p>}
+            {error && (
+                <div className="mt-6 p-4 bg-red-900/20 border border-red-500/50 rounded-xl text-red-200 text-sm max-w-lg mx-auto">
+                    <p className="font-bold flex items-center justify-center gap-2 mb-1"><AlertCircle className="w-4 h-4" /> Analysis Failed</p>
+                    <p>{error}</p>
+                </div>
+            )}
           </div>
         )}
 

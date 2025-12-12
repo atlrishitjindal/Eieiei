@@ -5,7 +5,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = loadEnv(mode, (process as any).cwd(), '');
+
+  // Log warning if API key is missing during build (helpful for Vercel logs)
+  if (!env.API_KEY) {
+    console.warn("⚠️  WARNING: API_KEY is not defined in the environment variables. AI features will likely fail in production.");
+  }
 
   return {
     plugins: [react()],

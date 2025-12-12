@@ -1,10 +1,12 @@
-import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job, SkillSuggestion, ChatMessage } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key not found in environment. Please ensure it is set.");
+  if (!apiKey) {
+    throw new Error("API Key not found. If you are on Vercel, please add 'API_KEY' to your project's Environment Variables.");
+  }
   return new GoogleGenAI({ apiKey });
 };
 
@@ -38,7 +40,7 @@ const handleGeminiError = async (error: any): Promise<never> => {
             console.error("Failed to open key selector", e);
         }
      }
-     throw new Error("Your API key was rejected (403). Please refresh the page to provide a valid key.");
+     throw new Error("Your API key was rejected (403). Please check your quota or refresh the page.");
   }
 
   if (errorMessage.includes("400")) {

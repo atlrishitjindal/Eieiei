@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff } from 'lucide-react';
-import { GoogleGenerativeAI, LiveServerMessage } from '@google/generative-ai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
 import { cn } from '../lib/utils';
@@ -32,9 +32,6 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   // Canvas ref for video frame capture
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameIntervalRef = useRef<number | null>(null);
-
-  // Initialize Gemini Client
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const stopAudio = () => {
      if (audioContextRef.current) {
@@ -89,6 +86,12 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   };
 
   const connect = async () => {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        setError("API Key is missing. Please add API_KEY to your environment variables (e.g. Vercel dashboard).");
+        return;
+    }
+
     if (!resumeAnalysis) {
         setError("Please upload a resume first to start the interview simulation.");
         return;
@@ -98,6 +101,9 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
     setError(null);
 
     try {
+      // Initialize client inside the action to be safe
+      const ai = new GoogleGenAI({ apiKey });
+
       // 1. Setup Audio Contexts
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       nextStartTimeRef.current = audioContextRef.current.currentTime;
@@ -116,7 +122,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
-            responseModalities: ["audio"],
+            responseModalities: [Modality.AUDIO],
             systemInstruction: `You are an experienced hiring manager conducting a job interview. 
             The candidate's summary is: "${resumeAnalysis.summary}". 
             Their key strengths are: ${resumeAnalysis.strengths.join(', ')}.
@@ -159,6 +165,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
 
                     const pcmBlob = createPcmBlob(inputData);
                     
+                    // We must use the promise stored in ref because session isn't available in closure yet when defined
                     if (sessionPromiseRef.current) {
                         sessionPromiseRef.current.then(session => {
                             try {
