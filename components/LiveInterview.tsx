@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff } from 'lucide-react';
-import { GoogleGenerativeAI, LiveServerMessage, Modality } from '@google/generative-ai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
 import { cn } from '../lib/utils';
@@ -373,7 +373,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                      </div>
                  )}
                  <div className="absolute bottom-2 left-2 flex gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
+                      <div className={cn("w-2 h-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-50")} />
                  </div>
              </div>
           </div>
