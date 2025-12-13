@@ -27,7 +27,7 @@ const handleGeminiError = async (error: any): Promise<never> => {
   }
   
   if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-      throw new Error("The AI model is currently unavailable. Please try again later.");
+      throw new Error("The AI model is currently unavailable or the API Key is invalid. Please check your API Key.");
   }
 
   throw new Error(errorMessage);
@@ -142,23 +142,14 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
 
 export const getMarketInsights = async (query: string): Promise<InsightResult> => {
   const genAI = getAiClient();
-  // Using gemini-1.5-flash-8b as it is often faster for tool use, or standard flash. 
-  // Tools config in v1 is different.
   const model = genAI.getGenerativeModel({
     model: 'gemini-1.5-flash',
-    // tools: [{ googleSearch: {} }] // Note: Google Search tool availability varies by region/key in v1
   });
 
   try {
-    // Basic fallback without live search tool if not available in standard v1 tier
-    // For full search, one usually needs Vertex AI or specific beta endpoints.
-    // We will attempt a standard generation which often knows recent-ish info, 
-    // or return a disclaimer if live data is strictly needed.
     const result = await model.generateContent(`Provide market insights for: ${query}. Include salary ranges and trends.`);
     const text = result.response.text() || "No insights found.";
     
-    // V1 SDK does not consistently return grounding metadata in the same structure as V2 for all keys.
-    // We'll return text only for stability.
     return { text, sources: [] };
   } catch (error) {
     return { text: "I couldn't access market data at the moment. " + (error as any).message, sources: [] };
