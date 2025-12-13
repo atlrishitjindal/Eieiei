@@ -1,12 +1,12 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeAnalysis, InsightResult, InterviewReport, JobMatchResult, Job, SkillSuggestion, ChatMessage } from "../types";
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API Key not found. If you are on Vercel, please add 'API_KEY' to your project's Environment Variables.");
+    throw new Error("API Key not found. Please add 'API_KEY' to your project's .env file or environment variables.");
   }
-  return new GoogleGenerativeAI(apiKey);
+  return new GoogleGenAI({ apiKey });
 };
 
 const handleGeminiError = async (error: any): Promise<never> => {
@@ -27,13 +27,19 @@ const handleGeminiError = async (error: any): Promise<never> => {
   }
   
   if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-      throw new Error("The AI model is currently unavailable or the API Key is invalid. Please check your API Key.");
+      throw new Error("The AI model is currently unavailable (404). This might be a temporary regional issue.");
+  }
+
+  // Handle 400 Invalid Argument gracefully
+  if (errorMessage.includes("400") || errorMessage.includes("INVALID_ARGUMENT")) {
+      throw new Error("The file format or content is not supported by the AI model. Please try a different file.");
   }
 
   throw new Error(errorMessage);
 };
 
-const cleanJson = (text: string) => {
+const cleanJson = (text: string | undefined) => {
+  if (!text) return "";
   return text.replace(/```json|```/g, '').trim();
 };
 
@@ -41,31 +47,14 @@ export const analyzeResume = async (
   data: string,
   mimeType: string
 ): Promise<ResumeAnalysis> => {
-  const genAI = getAiClient();
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          score: { type: SchemaType.NUMBER },
-          summary: { type: SchemaType.STRING },
-          strengths: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          weaknesses: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          improvements: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          skills: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-        },
-        required: ["score", "summary", "strengths", "weaknesses", "improvements", "skills"]
-      }
-    }
-  });
+  const ai = getAiClient();
   
   // Normalize MIME type
   let normalizedMimeType = mimeType;
   if (mimeType.includes('pdf')) normalizedMimeType = 'application/pdf';
   else if (mimeType.includes('png')) normalizedMimeType = 'image/png';
   else if (mimeType.includes('jpg') || mimeType.includes('jpeg')) normalizedMimeType = 'image/jpeg';
+  else if (mimeType === '') normalizedMimeType = 'application/pdf'; // Default fallback
 
   const prompt = `Analyze this resume acting as a helpful and encouraging Applicant Tracking System (ATS) consultant. 
   Identify the candidate's target role based on experience.
@@ -78,12 +67,32 @@ export const analyzeResume = async (
   `;
 
   try {
-    const result = await model.generateContent([
-      { inlineData: { data: data, mimeType: normalizedMimeType } },
-      prompt
-    ]);
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          { inlineData: { data: data, mimeType: normalizedMimeType } },
+          { text: prompt }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            summary: { type: Type.STRING },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["score", "summary", "strengths", "weaknesses", "improvements", "skills"]
+        }
+      }
+    });
 
-    const text = result.response.text();
+    const text = response.text;
     if (!text) throw new Error("No response received from AI model.");
     
     return JSON.parse(cleanJson(text)) as ResumeAnalysis;
@@ -93,46 +102,48 @@ export const analyzeResume = async (
 };
 
 export const generateImprovementExample = async (improvement: string, resumeSummary: string): Promise<string> => {
-  const genAI = getAiClient();
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const ai = getAiClient();
   const prompt = `Context: Resume Summary: "${resumeSummary}". Improvement: "${improvement}".
   Task: Write a specific, concrete example (1-2 sentences) of how to implement this improvement.`;
   
   try {
-    const result = await model.generateContent(prompt);
-    return result.response.text() || "Could not generate example.";
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt
+    });
+    return response.text || "Could not generate example.";
   } catch (error) {
     return handleGeminiError(error) as any;
   }
 };
 
 export const generateInterviewReport = async (transcript: string): Promise<InterviewReport> => {
-  const genAI = getAiClient();
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          overallScore: { type: SchemaType.NUMBER },
-          technicalScore: { type: SchemaType.NUMBER },
-          communicationScore: { type: SchemaType.NUMBER },
-          strengths: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          improvements: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-        },
-        required: ["overallScore", "technicalScore", "communicationScore", "strengths", "improvements"]
-      }
-    }
-  });
-
+  const ai = getAiClient();
   const prompt = `Analyze this interview transcript.
   Transcript: ${transcript}
   Provide JSON assessment: overallScore (0-100), technicalScore, communicationScore, strengths, improvements.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            overallScore: { type: Type.NUMBER },
+            technicalScore: { type: Type.NUMBER },
+            communicationScore: { type: Type.NUMBER },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["overallScore", "technicalScore", "communicationScore", "strengths", "improvements"]
+        }
+      }
+    });
+
+    const text = response.text;
     if (!text) throw new Error("No report generated");
     return JSON.parse(cleanJson(text)) as InterviewReport;
   } catch (error) {
@@ -141,49 +152,36 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
 };
 
 export const getMarketInsights = async (query: string): Promise<InsightResult> => {
-  const genAI = getAiClient();
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-  });
+  const ai = getAiClient();
 
   try {
-    const result = await model.generateContent(`Provide market insights for: ${query}. Include salary ranges and trends.`);
-    const text = result.response.text() || "No insights found.";
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Provide market insights for: ${query}. Include salary ranges and trends.`,
+        config: {
+            tools: [{googleSearch: {}}]
+        }
+    });
+    const text = response.text || "No insights found.";
     
-    return { text, sources: [] };
+    // Extract sources if available from grounding metadata
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+        ?.filter(chunk => chunk.web?.uri && chunk.web?.title)
+        .map(chunk => ({
+            uri: chunk.web!.uri!,
+            title: chunk.web!.title!,
+            url: chunk.web!.uri!
+        })) || [];
+    
+    return { text, sources };
   } catch (error) {
     return { text: "I couldn't access market data at the moment. " + (error as any).message, sources: [] };
   }
 };
 
 export const generateTailoredJobs = async (resumeSummary: string, skills: string[]): Promise<Job[]> => {
-  const genAI = getAiClient();
+  const ai = getAiClient();
   const count = Math.floor(Math.random() * (12 - 5 + 1) + 5);
-
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            id: { type: SchemaType.STRING },
-            title: { type: SchemaType.STRING },
-            company: { type: SchemaType.STRING },
-            location: { type: SchemaType.STRING },
-            salary: { type: SchemaType.STRING },
-            type: { type: SchemaType.STRING },
-            description: { type: SchemaType.STRING },
-            requirements: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-            postedAt: { type: SchemaType.STRING },
-          },
-          required: ["id", "title", "company", "location", "salary", "type", "description", "requirements", "postedAt"],
-        }
-      }
-    }
-  });
 
   const prompt = `Generate ${count} realistic job postings that are highly relevant to this candidate profile.
   Candidate Summary: ${resumeSummary}
@@ -198,8 +196,33 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
   Return valid JSON.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              company: { type: Type.STRING },
+              location: { type: Type.STRING },
+              salary: { type: Type.STRING },
+              type: { type: Type.STRING },
+              description: { type: Type.STRING },
+              requirements: { type: Type.ARRAY, items: { type: Type.STRING } },
+              postedAt: { type: Type.STRING },
+            },
+            required: ["id", "title", "company", "location", "salary", "type", "description", "requirements", "postedAt"],
+          }
+        }
+      }
+    });
+
+    const text = response.text;
     if (!text) return [];
     return JSON.parse(cleanJson(text)) as Job[];
   } catch (error) {
@@ -208,26 +231,8 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
 };
 
 export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: string[], jobDescription: string): Promise<JobMatchResult> => {
-  const genAI = getAiClient();
+  const ai = getAiClient();
   
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          matchScore: { type: SchemaType.NUMBER },
-          summary: { type: SchemaType.STRING },
-          missingKeywords: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          pros: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          cons: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-        },
-        required: ["matchScore", "summary", "missingKeywords", "pros", "cons"]
-      }
-    }
-  });
-
   const prompt = `Role: Senior Recruiter & ATS Specialist.
   
   Candidate Profile:
@@ -240,8 +245,26 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
   Evaluate fit. Provide JSON response.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            matchScore: { type: Type.NUMBER },
+            summary: { type: Type.STRING },
+            missingKeywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+            pros: { type: Type.ARRAY, items: { type: Type.STRING } },
+            cons: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["matchScore", "summary", "missingKeywords", "pros", "cons"]
+        }
+      }
+    });
+
+    const text = response.text;
     if (!text) throw new Error("No response");
     return JSON.parse(cleanJson(text)) as JobMatchResult;
   } catch (error) {
@@ -250,8 +273,7 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
 };
 
 export const generateCoverLetter = async (resumeSummary: string, jobDescription: string): Promise<string> => {
-  const genAI = getAiClient();
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const ai = getAiClient();
   
   const prompt = `Write a professional, persuasive cover letter.
   
@@ -262,37 +284,19 @@ export const generateCoverLetter = async (resumeSummary: string, jobDescription:
   Return ONLY the cover letter text, no markdown.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    return result.response.text() || "Failed to generate cover letter.";
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt
+    });
+    return response.text || "Failed to generate cover letter.";
   } catch (error) {
     return handleGeminiError(error) as any;
   }
 };
 
 export const suggestSkills = async (currentSkills: string[], roleContext: string): Promise<SkillSuggestion[]> => {
-  const genAI = getAiClient();
+  const ai = getAiClient();
   
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            skill: { type: SchemaType.STRING },
-            reason: { type: SchemaType.STRING },
-            difficulty: { type: SchemaType.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
-            category: { type: SchemaType.STRING, enum: ["Technical", "Soft Skill", "Tool"] },
-            searchQuery: { type: SchemaType.STRING }
-          },
-          required: ["skill", "reason", "difficulty", "category", "searchQuery"]
-        }
-      }
-    }
-  });
-
   const prompt = `Based on the following candidate profile and skills, suggest 6 high-value skills they should learn.
   
   Role/Context: ${roleContext}
@@ -300,8 +304,29 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
   `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              skill: { type: Type.STRING },
+              reason: { type: Type.STRING },
+              difficulty: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
+              category: { type: Type.STRING, enum: ["Technical", "Soft Skill", "Tool"] },
+              searchQuery: { type: Type.STRING }
+            },
+            required: ["skill", "reason", "difficulty", "category", "searchQuery"]
+          }
+        }
+      }
+    });
+
+    const text = response.text;
     if (!text) return [];
     return JSON.parse(cleanJson(text)) as SkillSuggestion[];
   } catch (error) {
@@ -310,7 +335,7 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
 };
 
 export const sendChatMessage = async (history: ChatMessage[], newMessage: string, currentContext: string): Promise<string> => {
-  const genAI = getAiClient();
+  const ai = getAiClient();
   
   const systemInstruction = `You are CarrerBot, the intelligent assistant for the CarrerX platform. 
   Your goal is to help users navigate the website and explain its features.
@@ -333,45 +358,63 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
   `;
 
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      systemInstruction: systemInstruction
+    // 1. Clean history to ensure it complies with Gemini API rules (must start with 'user' role)
+    const validHistory = history.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.text }]
+    }));
+
+    // 2. Find the index of the first user message
+    const firstUserIndex = validHistory.findIndex(m => m.role === 'user');
+    let apiHistory = [];
+
+    // 3. Slice the history to start from the first user message
+    if (firstUserIndex !== -1) {
+      apiHistory = validHistory.slice(firstUserIndex);
+    }
+
+    const chat = ai.chats.create({
+      model: 'gemini-2.5-flash',
+      history: apiHistory,
+      config: { systemInstruction }
     });
 
-    const chat = model.startChat({
-      history: history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-      }))
-    });
-
-    const result = await chat.sendMessage(newMessage);
-    return result.response.text() || "I'm sorry, I didn't catch that.";
+    const response = await chat.sendMessage(newMessage);
+    return response.text || "I'm sorry, I didn't catch that.";
   } catch (error) {
     console.error("Chat error", error);
     return "I'm having trouble connecting right now. Please try again.";
   }
 };
 
-export const generateInterviewResponse = async (audioBase64: string, resumeContext: string, history: {role: string, text: string}[]): Promise<string> => {
-  const genAI = getAiClient();
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    systemInstruction: `You are an experienced hiring manager conducting a job interview.
+export const generateInterviewResponse = async (audioBase64: string, mimeType: string, resumeContext: string, history: {role: string, text: string}[]): Promise<string> => {
+  const ai = getAiClient();
+  
+  const systemInstruction = `You are an experienced hiring manager conducting a job interview.
     Context from resume: ${resumeContext}
     
     Goal: Assess their fit for a Senior role.
     Keep your responses concise and conversational (spoken word style). Do not be too verbose.
     If the candidate struggles, offer a small hint. Be professional but encouraging.
-    `
-  });
+  `;
   
   try {
-     const result = await model.generateContent([
-       { inlineData: { data: audioBase64, mimeType: "audio/webm" } },
-       "Please respond to the candidate's answer naturally."
-     ]);
-     return result.response.text();
+     // Ensure we use the exact mimeType provided by the recorder (e.g. audio/mp4 or audio/webm)
+     // Fallback to audio/webm if not provided, but the client should provide the supported one.
+     const safeMimeType = mimeType || "audio/webm";
+
+     const response = await ai.models.generateContent({
+       model: 'gemini-2.5-flash',
+       contents: {
+           parts: [
+               { inlineData: { data: audioBase64, mimeType: safeMimeType } },
+               { text: "Please respond to the candidate's answer naturally." }
+           ]
+       },
+       config: { systemInstruction }
+     });
+     
+     return response.text || "";
   } catch (e) {
      console.error("Interview Error", e);
      throw e;

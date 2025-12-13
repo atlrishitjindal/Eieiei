@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff, Play } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff, Play, FileText, User, Bot, Captions } from 'lucide-react';
 import { generateInterviewResponse } from '../services/gemini';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
@@ -17,20 +17,50 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<{role: 'user'|'ai', text: string}[]>([]);
+  const [realtimeText, setRealtimeText] = useState("");
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const mimeTypeRef = useRef<string>("audio/webm");
 
-  // Cleanup on unmount
+  // Determine supported mime type for this browser to avoid 400 errors
+  const getSupportedMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') return 'audio/webm';
+    const types = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/aac'];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return 'audio/webm'; // Fallback
+  };
+
+  // Initialize Speech Recognition
   useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).webkitSpeechRecognition) {
+        const recognition = new (window as any).webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        recognitionRef.current = recognition;
+    }
+
+    mimeTypeRef.current = getSupportedMimeType();
+
     return () => {
       stopVideo();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (recognitionRef.current) recognitionRef.current.stop();
     };
   }, []);
+
+  // Auto-scroll transcript
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [transcript]);
 
   const startSession = () => {
      if (!resumeAnalysis) {
@@ -39,6 +69,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
      }
      setIsActive(true);
      setTranscript([]);
+     setRealtimeText("");
      speak("Hello! I've reviewed your resume. Are you ready to begin the interview?");
   };
 
@@ -47,6 +78,8 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
      stopVideo();
      if (window.speechSynthesis) window.speechSynthesis.cancel();
      setTranscript([]);
+     setRealtimeText("");
+     if (recognitionRef.current) recognitionRef.current.stop();
   };
 
   const toggleVideo = async () => {
@@ -109,7 +142,8 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   const startRecording = async () => {
      try {
          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-         const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+         const mimeType = mimeTypeRef.current;
+         const recorder = new MediaRecorder(stream, { mimeType });
          
          mediaRecorderRef.current = recorder;
          audioChunksRef.current = [];
@@ -124,6 +158,18 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
          
          recorder.start();
          setIsRecording(true);
+         setRealtimeText("");
+         
+         // Start STT if available
+         if (recognitionRef.current) {
+             recognitionRef.current.onresult = (event: any) => {
+                 const text = Array.from(event.results)
+                    .map((result: any) => result[0].transcript)
+                    .join('');
+                 setRealtimeText(text);
+             };
+             recognitionRef.current.start();
+         }
          
          // Cancel AI speech if user interrupts
          if (window.speechSynthesis) window.speechSynthesis.cancel();
@@ -142,6 +188,11 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
          
          // Stop tracks
          mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+
+         // Stop STT
+         if (recognitionRef.current) {
+             recognitionRef.current.stop();
+         }
      }
   };
 
@@ -162,18 +213,24 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   const processAudio = async () => {
       setIsProcessing(true);
       try {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          // Verify we have audio data
+          if (audioChunksRef.current.length === 0) {
+              throw new Error("No audio recorded. Please speak clearly.");
+          }
+
+          const mimeType = mimeTypeRef.current;
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
           const base64Audio = await blobToBase64(audioBlob);
           
-          setTranscript(prev => [...prev, { role: 'user', text: '(Audio Response)' }]);
+          const userText = realtimeText || "(Audio Response)";
+          setTranscript(prev => [...prev, { role: 'user', text: userText }]);
+          setRealtimeText(""); // clear realtime preview
 
           // Send to Gemini
           const context = `${resumeAnalysis?.summary}. Strengths: ${resumeAnalysis?.strengths.join(', ')}`;
           
-          // Note: In a real turn-based system we'd send history, but generateContent with audio 
-          // works best as a single prompt in the JS SDK unless using the ChatSession with multimodal history (advanced).
-          // For this demo, we use a single turn response.
-          const responseText = await generateInterviewResponse(base64Audio, context, []);
+          // Pass the CORRECT mime type to the service
+          const responseText = await generateInterviewResponse(base64Audio, mimeType, context, []);
           
           speak(responseText);
           
@@ -198,8 +255,8 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   }
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-8rem)]">
-      <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col h-full gap-6">
+      <div className="flex-none flex items-center justify-between">
          <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight font-display">Interview Sim</h1>
             <p className="text-slate-500 mt-2">Practice answering questions with an AI hiring manager.</p>
@@ -211,121 +268,164 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
          )}
       </div>
 
-      <Card className="flex-1 bg-slate-900 border-slate-800 relative overflow-hidden flex flex-col">
-          {/* Main Visual Area */}
-          <div className="flex-1 relative flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center">
-             <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" />
-             
-             {/* AI Avatar / Visualization */}
-             <div className="relative z-10 flex flex-col items-center gap-6">
-                <div className={cn(
-                    "w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 relative",
-                    isSpeaking ? "bg-purple-600 shadow-[0_0_40px_-10px_rgba(147,51,234,0.5)] scale-110" : "bg-slate-700"
-                )}>
-                    {isSpeaking ? (
-                        <>
-                           <div className="absolute inset-0 rounded-full border-2 border-purple-400 opacity-50 animate-ping" style={{ animationDuration: '2s' }} />
-                           <Volume2 className="w-12 h-12 text-white" />
-                        </>
-                    ) : (
-                        <Mic className="w-12 h-12 text-slate-400" />
-                    )}
-                </div>
-                
-                <div className="text-center space-y-2 px-4">
-                    <h3 className="text-2xl font-bold text-white">AI Interviewer</h3>
-                    {transcript.length > 0 && (
-                        <div className="max-w-md mx-auto h-16 flex items-center justify-center">
-                           <p className="text-slate-300 text-sm italic line-clamp-2">
-                              "{transcript[transcript.length - 1].text}"
-                           </p>
+      <div className="flex-1 min-h-0 grid lg:grid-cols-3 gap-6 pb-6">
+          {/* Main Stage */}
+          <Card className="lg:col-span-2 bg-slate-900 border-slate-800 relative overflow-hidden flex flex-col order-1 shadow-2xl">
+              {/* Main Visual Area */}
+              <div className="flex-1 relative flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center min-h-[400px]">
+                 <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" />
+                 
+                 {/* AI Avatar / Visualization */}
+                 <div className="relative z-10 flex flex-col items-center gap-6">
+                    <div className={cn(
+                        "w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 relative",
+                        isSpeaking ? "bg-purple-600 shadow-[0_0_40px_-10px_rgba(147,51,234,0.5)] scale-110" : "bg-slate-700"
+                    )}>
+                        {isSpeaking ? (
+                            <>
+                               <div className="absolute inset-0 rounded-full border-2 border-purple-400 opacity-50 animate-ping" style={{ animationDuration: '2s' }} />
+                               <Volume2 className="w-12 h-12 text-white" />
+                            </>
+                        ) : (
+                            <Mic className="w-12 h-12 text-slate-400" />
+                        )}
+                    </div>
+                    
+                    <div className="text-center space-y-2 px-4">
+                        <h3 className="text-2xl font-bold text-white">AI Interviewer</h3>
+                        <p className="text-slate-400 text-sm">
+                            {isProcessing ? "Thinking..." : isSpeaking ? "Speaking..." : isRecording ? "Listening..." : "Ready"}
+                        </p>
+                    </div>
+
+                    {/* LIVE CAPTIONS - Transcribe Below Feature */}
+                    <div className="mt-8 max-w-lg w-full px-6">
+                        <div className="bg-black/40 backdrop-blur-md rounded-xl p-4 border border-white/10 text-center min-h-[80px] flex items-center justify-center">
+                            {realtimeText ? (
+                                <p className="text-white font-medium animate-pulse">{realtimeText}</p>
+                            ) : isSpeaking && transcript.length > 0 && transcript[transcript.length-1].role === 'ai' ? (
+                                <p className="text-purple-200">{transcript[transcript.length-1].text}</p>
+                            ) : (
+                                <p className="text-slate-500 italic text-sm flex items-center gap-2">
+                                    <Captions className="w-4 h-4" /> Live captions will appear here
+                                </p>
+                            )}
                         </div>
-                    )}
-                </div>
-             </div>
-             
-             {/* Self View (Video) */}
-             <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg border border-slate-700 overflow-hidden shadow-xl">
-                 {isVideoOn ? (
-                     <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
-                 ) : (
-                     <div className="w-full h-full flex items-center justify-center text-slate-600">
-                         <VideoOff className="w-8 h-8" />
-                     </div>
-                 )}
-                 <div className="absolute bottom-2 left-2 flex gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", isActive ? "bg-green-500" : "bg-red-50")} />
+                    </div>
                  </div>
-             </div>
-          </div>
-
-          {/* Controls Bar */}
-          <div className="p-6 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-6 relative z-20">
-              {!isActive ? (
-                  <Button 
-                    size="xl" 
-                    onClick={startSession} 
-                    className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20 rounded-full px-8"
-                  >
-                    <Play className="w-5 h-5 mr-2" /> Start Interview
-                  </Button>
-              ) : (
-                  <>
-                      {/* Record Button */}
-                      <button 
-                         onClick={toggleRecording}
-                         disabled={isProcessing || isSpeaking}
-                         className={cn(
-                             "w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-xl border-4",
-                             isRecording 
-                                ? "bg-red-600 border-red-800 animate-pulse scale-110" 
-                                : isProcessing 
-                                   ? "bg-slate-700 border-slate-600 cursor-wait"
-                                   : "bg-white text-slate-900 border-slate-200 hover:bg-slate-100"
-                         )}
-                      >
-                          {isProcessing ? (
-                              <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                          ) : isRecording ? (
-                              <div className="w-8 h-8 bg-white rounded-md" /> // Stop icon
-                          ) : (
-                              <Mic className="w-8 h-8" />
-                          )}
-                      </button>
-                      
-                      <button 
-                         onClick={toggleVideo}
-                         className={cn(
-                             "absolute right-24 w-12 h-12 rounded-full flex items-center justify-center transition-all",
-                             !isVideoOn ? "bg-slate-800 text-slate-400 hover:bg-slate-700" : "bg-slate-800 text-white hover:bg-slate-700"
-                         )}
-                      >
-                          {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                      </button>
-
-                      <button 
-                         onClick={endSession}
-                         className="absolute right-6 w-12 h-12 rounded-full bg-red-900/50 text-red-500 flex items-center justify-center hover:bg-red-900/80 transition-all"
-                         title="End Interview"
-                      >
-                          <PhoneOff className="w-5 h-5" />
-                      </button>
-                  </>
-              )}
-          </div>
-          
-          {error && (
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 backdrop-blur-sm z-30">
-                  <AlertCircle className="w-4 h-4" /> {error}
+                 
+                 {/* Self View (Video) */}
+                 <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg border border-slate-700 overflow-hidden shadow-xl z-20">
+                     {isVideoOn ? (
+                         <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                     ) : (
+                         <div className="w-full h-full flex items-center justify-center text-slate-600">
+                             <VideoOff className="w-8 h-8" />
+                         </div>
+                     )}
+                     <div className="absolute bottom-2 left-2 flex gap-2">
+                          <div className={cn("w-2 h-2 rounded-full", isActive ? "bg-green-500" : "bg-red-50")} />
+                     </div>
+                 </div>
               </div>
-          )}
-      </Card>
-      
-      {isActive && (
-          <div className="mt-4 text-center text-slate-500 text-sm">
-             {isRecording ? "Listening... click to stop." : isProcessing ? "Thinking..." : isSpeaking ? "Interviewer speaking..." : "Click microphone to answer."}
-          </div>
-      )}
+
+              {/* Controls Bar */}
+              <div className="p-6 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-6 relative z-20">
+                  {!isActive ? (
+                      <Button 
+                        size="xl" 
+                        onClick={startSession} 
+                        className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20 rounded-full px-8"
+                      >
+                        <Play className="w-5 h-5 mr-2" /> Start Interview
+                      </Button>
+                  ) : (
+                      <>
+                          {/* Record Button */}
+                          <button 
+                             onClick={toggleRecording}
+                             disabled={isProcessing || isSpeaking}
+                             className={cn(
+                                 "w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-xl border-4",
+                                 isRecording 
+                                    ? "bg-red-600 border-red-800 animate-pulse scale-110" 
+                                    : isProcessing 
+                                       ? "bg-slate-700 border-slate-600 cursor-wait"
+                                       : "bg-white text-slate-900 border-slate-200 hover:bg-slate-100"
+                             )}
+                          >
+                              {isProcessing ? (
+                                  <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                              ) : isRecording ? (
+                                  <div className="w-8 h-8 bg-white rounded-md" /> // Stop icon
+                              ) : (
+                                  <Mic className="w-8 h-8" />
+                              )}
+                          </button>
+                          
+                          <button 
+                             onClick={toggleVideo}
+                             className={cn(
+                                 "absolute right-24 w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                                 !isVideoOn ? "bg-slate-800 text-slate-400 hover:bg-slate-700" : "bg-slate-800 text-white hover:bg-slate-700"
+                             )}
+                          >
+                              {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                          </button>
+
+                          <button 
+                             onClick={endSession}
+                             className="absolute right-6 w-12 h-12 rounded-full bg-red-900/50 text-red-500 flex items-center justify-center hover:bg-red-900/80 transition-all"
+                             title="End Interview"
+                          >
+                              <PhoneOff className="w-5 h-5" />
+                          </button>
+                      </>
+                  )}
+              </div>
+              
+              {error && (
+                  <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 backdrop-blur-sm z-30">
+                      <AlertCircle className="w-4 h-4" /> {error}
+                  </div>
+              )}
+          </Card>
+
+          {/* Transcript Panel - Full History */}
+          <Card className="lg:col-span-1 flex flex-col bg-white border-slate-200 shadow-sm overflow-hidden order-2 h-full max-h-[600px] lg:max-h-full">
+             <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-900 flex items-center gap-2">
+                 <FileText className="w-4 h-4 text-purple-600" /> Full Transcript
+             </div>
+             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+                 {transcript.length === 0 ? (
+                     <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm text-center">
+                         <FileText className="w-8 h-8 mb-2 opacity-20" />
+                         <p>Conversation history will appear here.</p>
+                     </div>
+                 ) : (
+                     transcript.map((item, idx) => (
+                         <div key={idx} className={cn("flex gap-3", item.role === 'user' ? "flex-row-reverse" : "")}>
+                             <div className={cn(
+                                 "w-8 h-8 rounded-full flex items-center justify-center flex-none shadow-sm",
+                                 item.role === 'user' ? "bg-slate-200 text-slate-600" : "bg-purple-100 text-purple-600"
+                             )}>
+                                 {item.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                             </div>
+                             <div className={cn(
+                                 "p-3 rounded-2xl text-sm shadow-sm max-w-[85%]",
+                                 item.role === 'user' 
+                                    ? "bg-white text-slate-700 rounded-tr-none border border-slate-200" 
+                                    : "bg-purple-600 text-white rounded-tl-none"
+                             )}>
+                                 {item.text}
+                             </div>
+                         </div>
+                     ))
+                 )}
+                 <div ref={transcriptEndRef} />
+             </div>
+          </Card>
+      </div>
     </div>
   );
 };
