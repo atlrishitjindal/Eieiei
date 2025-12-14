@@ -12,9 +12,10 @@ interface DashboardProps {
   activities: ActivityLog[];
   applications?: Application[];
   jobs?: Job[];
+  onPostJob?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, setCurrentView, resumeAnalysis, activities, applications = [], jobs = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, setCurrentView, resumeAnalysis, activities, applications = [], jobs = [], onPostJob }) => {
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -53,7 +54,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setCurrentView, resumeAnaly
              <Button onClick={() => setCurrentView(AppView.JOBS)} variant="secondary" className="shadow-sm">
                <Briefcase className="w-4 h-4 mr-2" /> View Jobs
              </Button>
-             <Button onClick={() => {}} variant="primary" className="bg-purple-600 hover:bg-purple-700 shadow-purple-600/20">
+             <Button onClick={onPostJob} variant="primary" className="bg-purple-600 hover:bg-purple-700 shadow-purple-600/20">
                 <Plus className="w-4 h-4 mr-2" /> Post Job
              </Button>
            </div>

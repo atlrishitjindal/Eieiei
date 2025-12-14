@@ -39,6 +39,9 @@ function App() {
   // Track ownership of applications to prevent employers from overwriting candidate ownership
   const [applicationOwners, setApplicationOwners] = useState<Record<string, string>>({});
 
+  // Navigation Intents
+  const [postJobIntent, setPostJobIntent] = useState(false);
+
   // Initialize Auth Listener & Session Restoration
   useEffect(() => {
     const isRecovery = typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('type=recovery');
@@ -64,22 +67,42 @@ function App() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (_event === "PASSWORD_RECOVERY") {
         setViewState("auth_reset");
         return;
       }
 
-      if (_event === 'SIGNED_IN' && session?.user && viewState !== 'app') {
-         setUser({
-            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || '',
-            role: (session.user.user_metadata.role as UserRole) || 'candidate',
-            id: session.user.id,
-            phone: session.user.user_metadata.phone,
-            address: session.user.user_metadata.address
-         });
-         setViewState('app');
+      if ((_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') && session?.user) {
+         // Determine Role (Handle OAuth post-login role assignment)
+         let userRole = (session.user.user_metadata.role as UserRole);
+         
+         // If role is missing (common with first-time OAuth), check for pending role
+         if (!userRole) {
+             const pendingRole = localStorage.getItem('carrerx_pending_role') as UserRole | null;
+             if (pendingRole) {
+                 userRole = pendingRole;
+                 // Update the user metadata in Supabase
+                 await supabase.auth.updateUser({
+                     data: { role: userRole }
+                 });
+             } else {
+                 userRole = 'candidate'; // Default fallback
+             }
+             localStorage.removeItem('carrerx_pending_role');
+         }
+
+         if (viewState !== 'app' || user?.role !== userRole) {
+             setUser({
+                name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
+                email: session.user.email || '',
+                role: userRole,
+                id: session.user.id,
+                phone: session.user.user_metadata.phone,
+                address: session.user.user_metadata.address
+             });
+             setViewState('app');
+         }
       }
       
       if (_event === 'SIGNED_OUT') {
@@ -89,7 +112,7 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user?.role, viewState]); // Added dependencies to ensure state updates correctly
 
   // Fetch Data from DB/LocalStorage when User Logs In
   useEffect(() => {
@@ -342,6 +365,11 @@ function App() {
     }
   };
 
+  const handlePostJobRequest = () => {
+    setCurrentView(AppView.JOBS);
+    setPostJobIntent(true);
+  };
+
   const handlePostJob = (job: Job) => {
     setJobs(prev => [job, ...prev]);
     addActivity("Job Posted", job.title);
@@ -350,6 +378,18 @@ function App() {
     const globalJobs = JSON.parse(localStorage.getItem('carrerx_global_jobs') || '[]');
     const updatedGlobalJobs = [job, ...globalJobs];
     localStorage.setItem('carrerx_global_jobs', JSON.stringify(updatedGlobalJobs));
+  };
+
+  const handleUpdateJob = (updatedJob: Job) => {
+    setJobs(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+    addActivity("Job Updated", updatedJob.title);
+
+    // Sync Global
+    const globalJobs = JSON.parse(localStorage.getItem('carrerx_global_jobs') || '[]');
+    if (globalJobs.some((j: Job) => j.id === updatedJob.id)) {
+        const newGlobal = globalJobs.map((j: Job) => j.id === updatedJob.id ? updatedJob : j);
+        localStorage.setItem('carrerx_global_jobs', JSON.stringify(newGlobal));
+    }
   };
 
   const handleUpdateApplicationStatus = async (id: string, newStatus: Application['status'], interviewDate?: Date) => {
@@ -478,6 +518,7 @@ function App() {
                    activities={activities}
                    applications={applications}
                    jobs={jobs}
+                   onPostJob={handlePostJobRequest}
                  />
               )}
 
@@ -518,6 +559,9 @@ function App() {
                   userRole={user?.role}
                   applications={applications}
                   onPostJob={handlePostJob}
+                  onUpdateJob={handleUpdateJob}
+                  postJobIntent={postJobIntent}
+                  onClearPostJobIntent={() => setPostJobIntent(false)}
                 />
               )}
 

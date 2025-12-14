@@ -16,9 +16,25 @@ interface JobsProps {
   userRole?: UserRole;
   applications?: Application[];
   onPostJob?: (job: Job) => void;
+  onUpdateJob?: (job: Job) => void;
+  postJobIntent?: boolean;
+  onClearPostJobIntent?: () => void;
 }
 
-const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, onApply, appliedJobIds, userRole = 'candidate', applications = [], onPostJob }) => {
+const Jobs: React.FC<JobsProps> = ({ 
+    resumeAnalysis, 
+    onActivity, 
+    jobs, 
+    setJobs, 
+    onApply, 
+    appliedJobIds, 
+    userRole = 'candidate', 
+    applications = [], 
+    onPostJob,
+    onUpdateJob,
+    postJobIntent,
+    onClearPostJobIntent
+}) => {
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [matches, setMatches] = useState<Record<string, JobMatchResult>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,8 +42,9 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
   const [isGeneratingJobs, setIsGeneratingJobs] = useState(false);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   
-  // Employer Job Posting State
+  // Employer Job Posting/Editing State
   const [isPosting, setIsPosting] = useState(false);
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [newJob, setNewJob] = useState<Partial<Job>>({
     title: '',
     company: '',
@@ -40,6 +57,16 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
   const [reqInput, setReqInput] = useState('');
 
   const isEmployer = userRole === 'employer';
+
+  // Handle external post job intent from Dashboard
+  useEffect(() => {
+    if (postJobIntent) {
+        setIsPosting(true);
+        setEditingJobId(null);
+        setNewJob({ title: '', company: '', location: '', salary: '', type: 'Full-time', description: '', requirements: [] });
+        if (onClearPostJobIntent) onClearPostJobIntent();
+    }
+  }, [postJobIntent, onClearPostJobIntent]);
 
   // Initial generation only if empty and user is candidate
   useEffect(() => {
@@ -115,22 +142,56 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
     }
   };
 
+  const handleEditClick = (job: Job) => {
+    setEditingJobId(job.id);
+    setNewJob({
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        salary: job.salary,
+        type: job.type,
+        description: job.description,
+        requirements: job.requirements
+    });
+    setIsPosting(true);
+  };
+
   const handleSubmitJob = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onPostJob && newJob.title && newJob.company) {
-       onPostJob({
-         id: Date.now().toString(),
-         title: newJob.title!,
-         company: newJob.company!,
-         location: newJob.location || 'Remote',
-         salary: newJob.salary || 'Competitive',
-         type: newJob.type || 'Full-time',
-         description: newJob.description || '',
-         requirements: newJob.requirements || [],
-         postedAt: 'Just now'
-       });
-       setIsPosting(false);
-       setNewJob({ title: '', company: '', location: '', salary: '', type: 'Full-time', description: '', requirements: [] });
+    if (newJob.title && newJob.company) {
+        if (editingJobId && onUpdateJob) {
+            // Update existing
+            const originalJob = jobs.find(j => j.id === editingJobId);
+            if (originalJob) {
+                const jobToUpdate: Job = {
+                    ...originalJob,
+                    title: newJob.title,
+                    company: newJob.company,
+                    location: newJob.location || 'Remote',
+                    salary: newJob.salary || 'Competitive',
+                    type: newJob.type || 'Full-time',
+                    description: newJob.description || '',
+                    requirements: newJob.requirements || []
+                };
+                onUpdateJob(jobToUpdate);
+            }
+        } else if (onPostJob) {
+             // Create new
+             onPostJob({
+                 id: Date.now().toString(),
+                 title: newJob.title!,
+                 company: newJob.company!,
+                 location: newJob.location || 'Remote',
+                 salary: newJob.salary || 'Competitive',
+                 type: newJob.type || 'Full-time',
+                 description: newJob.description || '',
+                 requirements: newJob.requirements || [],
+                 postedAt: 'Just now'
+             });
+        }
+        setIsPosting(false);
+        setNewJob({ title: '', company: '', location: '', salary: '', type: 'Full-time', description: '', requirements: [] });
+        setEditingJobId(null);
     }
   };
 
@@ -160,7 +221,7 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
               className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h2 className="text-xl font-bold text-slate-900">Post New Job</h2>
+                <h2 className="text-xl font-bold text-slate-900">{editingJobId ? 'Edit Job' : 'Post New Job'}</h2>
                 <button onClick={() => setIsPosting(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
               </div>
               <form onSubmit={handleSubmitJob} className="p-6 space-y-6">
@@ -223,7 +284,7 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
 
                 <div className="pt-4 flex justify-end gap-3">
                   <Button type="button" variant="ghost" onClick={() => setIsPosting(false)}>Cancel</Button>
-                  <Button type="submit" variant="primary" className="bg-purple-600 hover:bg-purple-700">Create Listing</Button>
+                  <Button type="submit" variant="primary" className="bg-purple-600 hover:bg-purple-700">{editingJobId ? 'Update Listing' : 'Create Listing'}</Button>
                 </div>
               </form>
             </motion.div>
@@ -246,7 +307,7 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
             </p>
           </div>
           {isEmployer ? (
-             <Button onClick={() => setIsPosting(true)} variant="primary" className="bg-purple-600 hover:bg-purple-700 gap-2">
+             <Button onClick={() => { setEditingJobId(null); setNewJob({ title: '', company: '', location: '', salary: '', type: 'Full-time', description: '', requirements: [] }); setIsPosting(true); }} variant="primary" className="bg-purple-600 hover:bg-purple-700 gap-2">
                <Plus className="w-4 h-4" /> Post New Job
              </Button>
           ) : (
@@ -334,7 +395,7 @@ const Jobs: React.FC<JobsProps> = ({ resumeAnalysis, onActivity, jobs, setJobs, 
                                <div className="text-2xl font-bold text-slate-900">{applicantCount}</div>
                                <div className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Applicants</div>
                             </div>
-                            <Button variant="outline" size="sm" className="w-full">
+                            <Button variant="outline" size="sm" className="w-full" onClick={() => handleEditClick(job)}>
                                <Eye className="w-4 h-4 mr-2" /> Edit Job
                             </Button>
                           </div>

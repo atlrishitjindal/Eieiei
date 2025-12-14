@@ -69,12 +69,13 @@ export const analyzeResume = async (
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: {
+      contents: [{
+        role: 'user',
         parts: [
           { inlineData: { data: data, mimeType: normalizedMimeType } },
           { text: prompt }
         ]
-      },
+      }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -109,7 +110,7 @@ export const generateImprovementExample = async (improvement: string, resumeSumm
   try {
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: prompt
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
     return response.text || "Could not generate example.";
   } catch (error) {
@@ -126,7 +127,7 @@ export const generateInterviewReport = async (transcript: string): Promise<Inter
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -157,7 +158,7 @@ export const getMarketInsights = async (query: string): Promise<InsightResult> =
   try {
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Provide market insights for: ${query}. Include salary ranges and trends.`,
+        contents: [{ role: 'user', parts: [{ text: `Provide market insights for: ${query}. Include salary ranges and trends.` }] }],
         config: {
             tools: [{googleSearch: {}}]
         }
@@ -198,7 +199,7 @@ export const generateTailoredJobs = async (resumeSummary: string, skills: string
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -247,7 +248,7 @@ export const analyzeJobMatch = async (resumeSummary: string, resumeSkills: strin
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -286,7 +287,7 @@ export const generateCoverLetter = async (resumeSummary: string, jobDescription:
   try {
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: prompt
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
     return response.text || "Failed to generate cover letter.";
   } catch (error) {
@@ -306,7 +307,7 @@ export const suggestSkills = async (currentSkills: string[], roleContext: string
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -340,26 +341,19 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
   const systemInstruction = `You are CarrerBot, the intelligent assistant for the CarrerX platform. 
   Your goal is to help users navigate the website and explain its features.
   
-  WEBSITE KNOWLEDGE BASE (What you know about CarrerX):
-  1. **Dashboard**: The central hub showing an overview of resume score, active applications, and recommended actions.
-  2. **Resume Analyzer**: Allows users to upload a PDF resume. It uses AI to score it (0-100), identify strengths/weaknesses, and suggest specific improvements.
-  3. **Interview Prep (Live Interview)**: A voice-based mock interview simulator.
-  4. **Job Matches**: Lists jobs tailored to the user's skills found in their resume.
-  5. **Cover Letter Writer**: Generates a tailored cover letter based on the user's resume and a pasted job description.
-  6. **Skill Suggestions**: Recommends skills to learn based on the user's profile.
-  7. **Market Insights**: A research tool to check salaries, trends, and industry news.
-  8. **My Applications**: Tracks the status of jobs the user has applied to.
+  WEBSITE KNOWLEDGE BASE:
+  1. Dashboard: Overview of score and actions.
+  2. Resume Analyzer: Upload PDF for scoring.
+  3. Interview Prep: Voice-based mock interview.
+  4. Job Matches: Tailored jobs.
   
-  CURRENT CONTEXT: The user is currently viewing the "${currentContext}" page.
-
-  GUIDELINES:
-  - Be helpful, concise, and professional.
-  - You are NOT a general LLM; keep the conversation focused on career, jobs, and using this website.
+  CURRENT CONTEXT: "${currentContext}" page.
   `;
 
   try {
     // 1. Clean history to ensure it complies with Gemini API rules (must start with 'user' role)
-    const validHistory = history.map(msg => ({
+    // Filter out empty messages
+    const validHistory = history.filter(msg => msg.text.trim() !== "").map(msg => ({
       role: msg.role,
       parts: [{ text: msg.text }]
     }));
@@ -379,7 +373,7 @@ export const sendChatMessage = async (history: ChatMessage[], newMessage: string
       config: { systemInstruction }
     });
 
-    const response = await chat.sendMessage(newMessage);
+    const response = await chat.sendMessage([{ text: newMessage }]);
     return response.text || "I'm sorry, I didn't catch that.";
   } catch (error) {
     console.error("Chat error", error);
@@ -399,18 +393,17 @@ export const generateInterviewResponse = async (audioBase64: string, mimeType: s
   `;
   
   try {
-     // Ensure we use the exact mimeType provided by the recorder (e.g. audio/mp4 or audio/webm)
-     // Fallback to audio/webm if not provided, but the client should provide the supported one.
      const safeMimeType = mimeType || "audio/webm";
 
      const response = await ai.models.generateContent({
        model: 'gemini-2.5-flash',
-       contents: {
+       contents: [{
+           role: 'user',
            parts: [
                { inlineData: { data: audioBase64, mimeType: safeMimeType } },
                { text: "Please respond to the candidate's answer naturally." }
            ]
-       },
+       }],
        config: { systemInstruction }
      });
      

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, PhoneOff, Loader2, Volume2, AlertCircle, Video, VideoOff, Play, FileText, User, Bot, Captions } from 'lucide-react';
+import { Mic, PhoneOff, Loader2, Volume2, AlertCircle, Play, FileText, User, Bot, Captions } from 'lucide-react';
 import { generateInterviewResponse } from '../services/gemini';
 import { ResumeAnalysis } from '../types';
 import { Button, Card, Badge } from './ui/DesignSystem';
@@ -14,31 +14,26 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<{role: 'user'|'ai', text: string}[]>([]);
   const [realtimeText, setRealtimeText] = useState("");
   
   // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const videoStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const mimeTypeRef = useRef<string>("audio/webm");
 
-  // Determine supported mime type for this browser to avoid 400 errors
   const getSupportedMimeType = () => {
     if (typeof MediaRecorder === 'undefined') return 'audio/webm';
     const types = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/aac'];
     for (const type of types) {
       if (MediaRecorder.isTypeSupported(type)) return type;
     }
-    return 'audio/webm'; // Fallback
+    return 'audio/webm';
   };
 
-  // Initialize Speech Recognition
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).webkitSpeechRecognition) {
         const recognition = new (window as any).webkitSpeechRecognition();
@@ -51,13 +46,11 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
     mimeTypeRef.current = getSupportedMimeType();
 
     return () => {
-      stopVideo();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       if (recognitionRef.current) recognitionRef.current.stop();
     };
   }, []);
 
-  // Auto-scroll transcript
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript]);
@@ -75,47 +68,17 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
 
   const endSession = () => {
      setIsActive(false);
-     stopVideo();
      if (window.speechSynthesis) window.speechSynthesis.cancel();
      setTranscript([]);
      setRealtimeText("");
      if (recognitionRef.current) recognitionRef.current.stop();
   };
 
-  const toggleVideo = async () => {
-      if (isVideoOn) {
-          stopVideo();
-      } else {
-          try {
-              const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-              videoStreamRef.current = stream;
-              if (videoRef.current) {
-                  videoRef.current.srcObject = stream;
-              }
-              setIsVideoOn(true);
-          } catch (e) {
-              console.error("Failed to access camera", e);
-              setError("Could not access camera.");
-          }
-      }
-  };
-
-  const stopVideo = () => {
-    if (videoStreamRef.current) {
-        videoStreamRef.current.getTracks().forEach(track => track.stop());
-        videoStreamRef.current = null;
-    }
-    setIsVideoOn(false);
-  };
-
   const speak = (text: string) => {
     if (!window.speechSynthesis) return;
-    
-    // Cancel current speech
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    // Try to find a good voice
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
     if (preferredVoice) utterance.voice = preferredVoice;
@@ -160,7 +123,6 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
          setIsRecording(true);
          setRealtimeText("");
          
-         // Start STT if available
          if (recognitionRef.current) {
              recognitionRef.current.onresult = (event: any) => {
                  const text = Array.from(event.results)
@@ -171,7 +133,6 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
              recognitionRef.current.start();
          }
          
-         // Cancel AI speech if user interrupts
          if (window.speechSynthesis) window.speechSynthesis.cancel();
          setIsSpeaking(false);
          
@@ -186,10 +147,8 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
          mediaRecorderRef.current.stop();
          setIsRecording(false);
          
-         // Stop tracks
          mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
 
-         // Stop STT
          if (recognitionRef.current) {
              recognitionRef.current.stop();
          }
@@ -201,7 +160,6 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        // Remove data url prefix (e.g. "data:audio/webm;base64,")
         const base64 = base64String.split(',')[1];
         resolve(base64);
       };
@@ -213,7 +171,6 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   const processAudio = async () => {
       setIsProcessing(true);
       try {
-          // Verify we have audio data
           if (audioChunksRef.current.length === 0) {
               throw new Error("No audio recorded. Please speak clearly.");
           }
@@ -224,12 +181,10 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
           
           const userText = realtimeText || "(Audio Response)";
           setTranscript(prev => [...prev, { role: 'user', text: userText }]);
-          setRealtimeText(""); // clear realtime preview
+          setRealtimeText(""); 
 
-          // Send to Gemini
           const context = `${resumeAnalysis?.summary}. Strengths: ${resumeAnalysis?.strengths.join(', ')}`;
           
-          // Pass the CORRECT mime type to the service
           const responseText = await generateInterviewResponse(base64Audio, mimeType, context, []);
           
           speak(responseText);
@@ -255,7 +210,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
   }
 
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="flex flex-col gap-6">
       <div className="flex-none flex items-center justify-between">
          <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight font-display">Interview Sim</h1>
@@ -268,14 +223,14 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
          )}
       </div>
 
-      <div className="flex-1 min-h-0 grid lg:grid-cols-3 gap-6 pb-6">
+      <div className="grid lg:grid-cols-3 gap-6 pb-6">
           {/* Main Stage */}
-          <Card className="lg:col-span-2 bg-slate-900 border-slate-800 relative overflow-hidden flex flex-col order-1 shadow-2xl">
-              {/* Main Visual Area */}
-              <div className="flex-1 relative flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center min-h-[400px]">
-                 <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" />
+          <Card className="lg:col-span-2 bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 relative overflow-hidden flex flex-col order-1 shadow-2xl">
+              {/* Main Visual Area - Audio Only */}
+              <div className="flex-1 relative flex items-center justify-center min-h-[350px]">
+                 <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
                  
-                 {/* AI Avatar / Visualization */}
+                 {/* AI Visualization */}
                  <div className="relative z-10 flex flex-col items-center gap-6">
                     <div className={cn(
                         "w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 relative",
@@ -298,7 +253,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                         </p>
                     </div>
 
-                    {/* LIVE CAPTIONS - Transcribe Below Feature */}
+                    {/* LIVE CAPTIONS */}
                     <div className="mt-8 max-w-lg w-full px-6">
                         <div className="bg-black/40 backdrop-blur-md rounded-xl p-4 border border-white/10 text-center min-h-[80px] flex items-center justify-center">
                             {realtimeText ? (
@@ -313,24 +268,10 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                         </div>
                     </div>
                  </div>
-                 
-                 {/* Self View (Video) */}
-                 <div className="absolute bottom-6 right-6 w-48 h-36 bg-black rounded-lg border border-slate-700 overflow-hidden shadow-xl z-20">
-                     {isVideoOn ? (
-                         <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
-                     ) : (
-                         <div className="w-full h-full flex items-center justify-center text-slate-600">
-                             <VideoOff className="w-8 h-8" />
-                         </div>
-                     )}
-                     <div className="absolute bottom-2 left-2 flex gap-2">
-                          <div className={cn("w-2 h-2 rounded-full", isActive ? "bg-green-500" : "bg-red-50")} />
-                     </div>
-                 </div>
               </div>
 
               {/* Controls Bar */}
-              <div className="p-6 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-6 relative z-20">
+              <div className="p-6 bg-transparent border-t border-white/10 flex items-center justify-center gap-6 relative z-20">
                   {!isActive ? (
                       <Button 
                         size="xl" 
@@ -357,20 +298,10 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
                               {isProcessing ? (
                                   <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
                               ) : isRecording ? (
-                                  <div className="w-8 h-8 bg-white rounded-md" /> // Stop icon
+                                  <div className="w-8 h-8 bg-white rounded-md" /> 
                               ) : (
                                   <Mic className="w-8 h-8" />
                               )}
-                          </button>
-                          
-                          <button 
-                             onClick={toggleVideo}
-                             className={cn(
-                                 "absolute right-24 w-12 h-12 rounded-full flex items-center justify-center transition-all",
-                                 !isVideoOn ? "bg-slate-800 text-slate-400 hover:bg-slate-700" : "bg-slate-800 text-white hover:bg-slate-700"
-                             )}
-                          >
-                              {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                           </button>
 
                           <button 
@@ -391,8 +322,8 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ resumeAnalysis }) => {
               )}
           </Card>
 
-          {/* Transcript Panel - Full History */}
-          <Card className="lg:col-span-1 flex flex-col bg-white border-slate-200 shadow-sm overflow-hidden order-2 h-full max-h-[600px] lg:max-h-full">
+          {/* Transcript Panel */}
+          <Card className="lg:col-span-1 flex flex-col bg-white border-slate-200 shadow-sm overflow-hidden order-2 h-[600px] lg:h-auto">
              <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-900 flex items-center gap-2">
                  <FileText className="w-4 h-4 text-purple-600" /> Full Transcript
              </div>
